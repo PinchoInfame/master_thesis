@@ -1,6 +1,8 @@
 import itertools
 import numpy as np
-from collision_detection import CollisionDetection
+from stl_games.collision_detection import CollisionDetection
+
+
 class CollisionHandler:
     def __init__(self):
         self.trajectory_to_be_modified=[]

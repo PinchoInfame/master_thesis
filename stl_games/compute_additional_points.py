@@ -1,5 +1,6 @@
-from augment_trajectory_points import AugmentTrajectoryPoints
-from augment_control_inputs import AugmentControlInput
+from stl_games.augment_trajectory_points import AugmentTrajectoryPoints
+from stl_games.augment_control_inputs import AugmentControlInput
+
 class ComputeAdditionalPoints:
     def __init__(self):
         self.augmented_trajectory = None

@@ -1,5 +1,5 @@
 import numpy as np
-from augment_control_inputs import AugmentControlInput
+from stl_games.augment_control_inputs import AugmentControlInput
 
 class ComputeTrajectories:
     def __init__(self):

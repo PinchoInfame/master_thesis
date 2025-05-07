@@ -1,5 +1,6 @@
 import numpy as np
 from stlpy.STL import LinearPredicate
+
 class ObstacleAvoidanceSTLSpecs:
     def __init__(self):
         self.obstacle_avoidance_spec = None

@@ -1,20 +1,17 @@
 import numpy as np
-import itertools
 import random
 import time
 import matplotlib.pyplot as plt
-from generate_valid_positions import GenerateValidPositions
-from obstacle_avoidance_stl_specs import ObstacleAvoidanceSTLSpecs
-from augment_control_inputs import AugmentControlInput
-from compute_trajectories import ComputeTrajectories
-from mpc_high_level2 import MPCHighLevelPlanner
-from goal_distance_stl_specs import GoalDistanceSTLSpecs
 from stlpy.systems import LinearSystem
-from product_dynamical_system import ProductDynamicalSystem
-from stlpy.solvers.gurobi.gurobi_micp import GurobiMICPSolver
-from plot_result import PlotResult
-from compute_additional_points import ComputeAdditionalPoints
-from mpc_cbf_linearized_multipleGoals import MPC_cbf_multiple_goals
+
+from stl_games.generate_valid_positions import GenerateValidPositions
+from stl_games.obstacle_avoidance_stl_specs import ObstacleAvoidanceSTLSpecs
+from stl_games.compute_trajectories import ComputeTrajectories
+from stl_games.mpc.mpc_high_level2 import MPCHighLevelPlanner
+from stl_games.goal_distance_stl_specs import GoalDistanceSTLSpecs
+
+
+from stl_games.plot_result import PlotResult
 
 # Set random seed for reproducibility
 random.seed(1)

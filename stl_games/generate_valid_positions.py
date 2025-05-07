@@ -1,5 +1,6 @@
 import numpy as np
 import random
+
 class GenerateValidPositions:
     def __init__(self):
         self.start_positions = []
