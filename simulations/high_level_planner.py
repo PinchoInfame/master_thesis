@@ -23,6 +23,7 @@ safe_dist_obs = 1 # Safety distance from obstacles
 grid_size = 100
 
 # Define the linear system dynamics for each robot (double integrator model)
+dt = 0.25
 Ad = np.array([[1, 0, dt, 0],  
                 [0, 1, 0, dt],  
                 [0, 0, 1, 0],  
