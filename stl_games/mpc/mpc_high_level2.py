@@ -1,8 +1,6 @@
 import cvxpy as cp
 import numpy as np
 import matplotlib.pyplot as plt
-from stlpy.systems import LinearSystem
-from product_dynamical_system import ProductDynamicalSystem
 
 class MPCHighLevelPlanner:
     def __init__(self, nx, nu, number_of_agents,  horizon, dt, u_min, u_max, safe_dist, position_tolerance, obs_list, step_to_reach_goal, list_xG):

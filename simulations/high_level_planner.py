@@ -4,67 +4,25 @@ import time
 import matplotlib.pyplot as plt
 from stlpy.systems import LinearSystem
 
-from stl_games.generate_valid_positions import GenerateValidPositions
-from stl_games.obstacle_avoidance_stl_specs import ObstacleAvoidanceSTLSpecs
-from stl_games.compute_trajectories import ComputeTrajectories
+from stl_games.environment.generate_valid_positions import GenerateValidPositions
+from stl_games.trajectory.trajectory_handler import ComputeTrajectories
+from stl_games.stl.stl_specs import ObstacleAvoidanceSTLSpecs, GoalDistanceSTLSpecs
 from stl_games.mpc.mpc_high_level2 import MPCHighLevelPlanner
-from stl_games.goal_distance_stl_specs import GoalDistanceSTLSpecs
+from stl_games.plot.plot_result import PlotResult
 
-
-from stl_games.plot_result import PlotResult
 
 # Set random seed for reproducibility
 random.seed(1)
-number_of_robots = 2
 
-# Define parameters
-eps = 1.0
-T = 40
-safe_dist = 3
-safe_dist_obs = 1
+# Define parameters for the experiment
+number_of_robots = 2
+eps = 1.0       # Tolerance for goal distance
+T = 40          # Time for reaching goal
+safe_dist = 3   # Safety distance from other robots
+safe_dist_obs = 1 # Safety distance from obstacles
 grid_size = 100
 
-# Define initial state and obstacles
-obstacle_bounds_list_mpc = [
-    (15, 25, 30, 40),
-    (60, 70, 80, 90),
-    (5, 15, 50, 60),
-    (40, 50, 10, 20),
-    (70, 80, 20, 30),
-    (25, 35, 75, 85),
-    (85, 95, 55, 65)]
-generate_valid_pos = GenerateValidPositions()
-generate_valid_pos.generate_valid_start_positions(grid_size, number_of_robots, obstacle_bounds_list_mpc, safe_dist+1, safe_dist_obs+1)
-start_positions = generate_valid_pos.start_positions
-print("start positions: ", start_positions)
-x0 = start_positions.flatten()
-
-# Modify trajectory to avoid collision with mpc receiding horizon approach
-start_time = time.time()
-dt = 0.25
-horizon_mpc = 4
-nx = 4
-nu = 2
-u_min = -3
-u_max = 3
-position_tolerance = eps
-number_of_goals_total = 4
-number_of_goals = ([2, 2])
-robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
-generate_valid_pos = GenerateValidPositions()
-generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, obstacle_bounds_list_mpc, safe_dist+1, safe_dist_obs+1)
-goal_positions = generate_valid_pos.goal_positions
-goal_positions_array = np.array(goal_positions)
-print("goal positions: ", goal_positions)
-#Todo: generate xG starting from goal positions
-xG = []
-for i in range(number_of_robots):
-    xGi = []
-    for j in range(number_of_goals[i]):
-        xGi.append(goal_positions[j])
-    goal_positions = goal_positions[number_of_goals[i]:]
-    xG.append(xGi)
-
+# Define the linear system dynamics for each robot (double integrator model)
 Ad = np.array([[1, 0, dt, 0],  
                 [0, 1, 0, dt],  
                 [0, 0, 1, 0],  
@@ -92,49 +50,57 @@ C_full = np.kron(np.eye(number_of_robots), Cd)
 D_full = np.kron(np.eye(number_of_robots), Dd)
 combined_system = LinearSystem(A_full, B_full, C_full, D_full)
 
+# Define the environment (obstacles, goal positions, initial positions)
 
-'''
-goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(eps, goal_positions_array, number_of_goals, number_of_robots, T)
-goal_spec = goal_spec_.goal_distance_spec
-obstacle_avoidance_spec_ = ObstacleAvoidanceSTLSpecs()
-obstacle_avoidance_spec_(obstacle_bounds_list_mpc, number_of_robots, T, safe_dist_obs)
-obstacle_avoidance_spec = obstacle_avoidance_spec_.obstacle_avoidance_spec
-combined_spec = obstacle_avoidance_spec & goal_spec
-solver = GurobiMICPSolver(combined_spec, combined_system, x0, T)
-solver.AddQuadraticCost(Q=1e-1*np.diag([0, 0, 1, 1] * (number_of_robots)), R=1e-1*np.eye(number_of_robots*2))
-solver.AddControlBounds(u_min=-3, u_max=3)
-#solver.AddRobustnessConstraint(rho_min=1.0)
-solver.AddRobustnessCost()
-x, u, rho, solver_time = solver.Solve()
+# Define the bounds of the obstacles in the format (x_min, x_max, y_min, y_max)
+obstacle_bounds_list_mpc = [
+    (15, 25, 30, 40),
+    (60, 70, 80, 90),
+    (5, 15, 50, 60),
+    (40, 50, 10, 20),
+    (70, 80, 20, 30),
+    (25, 35, 75, 85),
+    (85, 95, 55, 65)]
 
-plot = PlotResult()
-plt.figure(figsize=(10, 6))
-plot(x, x0, goal_positions_array, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list_mpc, safe_dist)
-plt.show()
-compute_traj = ComputeTrajectories()
-compute_traj.compute_y(x, u, number_of_robots)
-y_milp = compute_traj.y
-robustness_goal_reaching_milp = goal_spec.robustness(y_milp, 0)
-robustness_obstacle_avoidance_milp = obstacle_avoidance_spec.robustness(y_milp,0)
-print('robustness for reaching goal: ', robustness_goal_reaching_milp)
-print('robustness for obstacle avoidance: ', robustness_obstacle_avoidance_milp)
-'''
+# Generate valid start positions for the robots (not too close to obstacles or to each other)
+generate_valid_pos = GenerateValidPositions()
+generate_valid_pos.generate_valid_start_positions(grid_size, number_of_robots, obstacle_bounds_list_mpc, safe_dist+1, safe_dist_obs+1)
+start_positions = generate_valid_pos.start_positions
+print("start positions: ", start_positions)
+x0 = start_positions.flatten()
 
+# Generate valid goal positions for the robots (not too close to obstacles)
+number_of_goals_total = 4
+number_of_goals = ([2, 2])  # Number of goals for each robot
+generate_valid_pos = GenerateValidPositions()
+generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, obstacle_bounds_list_mpc, safe_dist+1, safe_dist_obs+1, number_of_robots, number_of_goals)
+goal_positions = generate_valid_pos.goal_positions
+xG = generate_valid_pos.xG
+print("goal positions for each robot: ", xG)
+
+# Define the parameters for the MPC
+dt = 0.25
+horizon_mpc = 4
+nx = 4  # Number of states (x, y, vx, vy) for each robot
+nu = 2  # Number of control inputs (ax, ay) for each robot
+u_min = -3  # Minimum control input (acceleration)
+u_max = 3   # Maximum control input (acceleration)
+
+# Define the time each robot has to reach its goal
 additional_points = int((1/dt)-1)
 time_to_reach_goals = np.array((T, T, T))
 step_to_reach_goal = time_to_reach_goals*(1+additional_points)
 
-mpc = MPCHighLevelPlanner(nx, nu, number_of_robots, horizon_mpc, dt, u_min, u_max, safe_dist, position_tolerance, obstacle_bounds_list_mpc, step_to_reach_goal, xG)
+# Build MPC problem
+start_time = time.time()
+mpc = MPCHighLevelPlanner(nx, nu, number_of_robots, horizon_mpc, dt, u_min, u_max, safe_dist, eps, obstacle_bounds_list_mpc, step_to_reach_goal, xG)
 mpc.build_problem(x0)
 
+# Solve the MPC in a receiding horizon fashion
 state_trajectory = [x0]
 control_trajectory = []
 x_current = x0
 max_iters_mpc = (1+additional_points)*T
-print(max_iters_mpc)
-#x_prev_init = x[:, :horizon_mpc+1]
-#u_prev_init = u[:, :horizon_mpc]
 u_opt, x_prev, u_prev = mpc.solve_mpc(x0, None, None, current_iteration=0)
 if u_opt is None:
     print("Solver failed")
@@ -155,44 +121,22 @@ state_trajectory = np.array(state_trajectory).T
 control_trajectory = np.array(control_trajectory).T
 end_time = time.time()
 print("Solver time: ", mpc.solver_time)
-#print("Robot1 velocity: ", np.max(np.abs(state_trajectory[:,2:4])))
-#print("Robot2 velocity: ", np.max(np.abs(state_trajectory[:,6:8])))
+#print("Robot1 max velocity: ", np.max(np.abs(state_trajectory[2:4,:])))
+#print("Robot2 max velocity: ", np.max(np.abs(state_trajectory[6:8,:])))
+
+# Plot results
 plot = PlotResult()
-plt.figure(figsize=(10, 6))
-plot(state_trajectory, x0, goal_positions_array, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list_mpc, safe_dist)
-plt.show()
+plot(state_trajectory, x0, goal_positions, number_of_goals, [], number_of_robots, obstacle_bounds_list_mpc, safe_dist)
 total_time = end_time-start_time
 print("Total execution time: ", total_time)
 
-'''
-'x_prev = state_trajectory[:, :horizon_mpc+1]
-u_prev = control_trajectory[:, :horizon_mpc]
-state_trajectory = [x0]
-control_trajectory = []
-x_current = x0
-for t in range(max_iters_mpc):
-    u_opt, x_prev, u_prev = mpc.solve_mpc(x_current, x_prev, u_prev, t)
-    if u_opt is None:
-        print("Solver failed")
-        exit()
-    x_current = mpc.define_dynamics(x_current, u_opt)
-    state_trajectory.append(x_current)
-    control_trajectory.append(u_opt)
-
-state_trajectory = np.array(state_trajectory).T
-control_trajectory = np.array(control_trajectory).T
-plot = PlotResult()
-plt.figure(figsize=(10, 6))
-plot(state_trajectory, x0, goal_positions_array, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list_mpc, safe_dist)
-plt.show()'
-'''
-
+# Analyze robustness of the resulting trajectory to STL specifications
 control_trajectory = np.hstack((control_trajectory, np.zeros((control_trajectory.shape[0],1))))
 compute_traj = ComputeTrajectories()
 compute_traj.compute_y(state_trajectory, control_trajectory, number_of_robots)
 y = compute_traj.y
 goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(eps, goal_positions_array, number_of_goals, number_of_robots, y.shape[1]-1)
+goal_spec_(eps, goal_positions, number_of_goals, number_of_robots, y.shape[1]-1)
 goal_spec = goal_spec_.goal_distance_spec
 obstacle_avoidance_spec_ = ObstacleAvoidanceSTLSpecs()
 obstacle_avoidance_spec_(obstacle_bounds_list_mpc, number_of_robots, y.shape[1]-1, safe_dist_obs)
@@ -203,8 +147,9 @@ robustness_obstacle_avoidance = obstacle_avoidance_spec.robustness(y,0)
 print('robustness for reaching goal: ', robustness_goal_reaching)
 print('robustness for obstacle avoidance: ', robustness_obstacle_avoidance)
 
+# Write the trajectory to a file (used for the visualization in Rviz)
+'''
 data_pairs = state_trajectory[4:6,:].T  
-
 # Open file and write
 with open('trajectory.txt', 'w') as f:
     for idx, (x, y) in enumerate(data_pairs):
@@ -214,32 +159,4 @@ with open('trajectory.txt', 'w') as f:
             f.write('\n')
         else:
             f.write(', ')
-
-
-'''
-compute_traj.compute_y(x, u, number_of_robots)
-y_milp = compute_traj.y
-goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(eps, , robot_id_list_associated_goals, number_of_robots, y_milp.shape[1]-1)
-goal_spec = goal_spec_.goal_distance_spec
-obstacle_avoidance_spec_ = ObstacleAvoidanceSTLSpecs()
-obstacle_avoidance_spec_(obstacle_bounds_list_mpc, number_of_robots, y_milp.shape[1]-1, safe_dist_obs)
-obstacle_avoidance_spec = obstacle_avoidance_spec_.obstacle_avoidance_spec
-combined_spec = obstacle_avoidance_spec & goal_spec
-robustness_goal_reaching_milp = goal_spec.robustness(y_milp, 0)
-robustness_obstacle_avoidance_milp = obstacle_avoidance_spec.robustness(y_milp,0)
-print('robustness for reaching goal MILP: ', robustness_goal_reaching_milp)
-print('robustness for obstacle avoidance MILP: ', robustness_obstacle_avoidance_milp)
-exit()
-solver = GurobiMICPSolver(combined_spec, combined_system, x0, T)
-solver.AddQuadraticCost(Q=1e-1*np.diag([0, 0, 1, 1] * (number_of_robots)), R=1e-1*np.eye(number_of_robots*2))
-solver.AddControlBounds(u_min=-5, u_max=5)
-#solver.AddRobustnessConstraint(rho_min=0.1)
-solver.AddRobustnessCost()
-x, u, rho, solver_time = solver.Solve()
-
-plot = PlotResult()
-plt.figure(figsize=(10, 6))
-plot(x, x0, goal_positions_array, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list_mpc, safe_dist)
-plt.show()'
 '''
