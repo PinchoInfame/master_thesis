@@ -26,6 +26,7 @@ safe_dist_obs = 1
 grid_size = 100
 
 # Define initial state and obstacles
+dt = 0.25
 obstacle_bounds_list = [
     (15, 25, 30, 40),
     (60, 70, 80, 90),
