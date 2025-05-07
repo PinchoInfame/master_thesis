@@ -19,7 +19,9 @@
 
 ### 1. Clone the Repository
 
+```bash
 git clone https://github.com/PinchoInfame/master_thesis.git
 cd master_thesis
 pip install -r requirements.txt
-pip install -e .
+pip install -e . 
+```
