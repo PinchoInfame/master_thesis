@@ -137,7 +137,7 @@ compute_traj = ComputeTrajectories()
 compute_traj.compute_y(state_trajectory, control_trajectory, number_of_robots)
 y = compute_traj.y  # y = output of the system (states + inputs)
 goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(goal_size, goal_positions, number_of_goals, number_of_robots, y.shape[1]-1)
+goal_spec_(goal_size, goal_positions, number_of_goals, number_of_robots, step_to_reach_goal)
 goal_spec = goal_spec_.goal_distance_spec
 robustness_goal_reaching = goal_spec.robustness(y, 0)
 compute_robustness = ComputeRobustness()
