@@ -11,7 +11,7 @@ class MPC_cbf_multiple_goals:
         self.dt = dt
         self.u_min = u_min
         self.u_max = u_max
-        self.R = 0.2*np.diag([1, 1, 1, 1])
+        self.R = 0.01*np.diag([1, 1, 1, 1])
         self.safe_dist = safe_dist + 1
         self.position_tolerance = position_tolerance
         self.obs_list = obs_list
@@ -72,12 +72,7 @@ class MPC_cbf_multiple_goals:
     def build_problem(self, x0, list_xG1, list_xG2):
         control_cost = 0
         v_max = 10
-        safe_dist_obs = 1.0
         constraints = []
-        #theta_min = np.deg2rad(-180)
-        #theta_max = np.deg2rad(180)
-        #tan_theta_min = np.tan(theta_min) 
-        #tan_theta_max = np.tan(theta_max)
         constraints.append(self.x[:, 0] == self.x0)
         slack_cbf1_1 = cp.Variable((self.number_of_goals1, self.horizon), nonneg=True)
         slack_cbf1_2 = cp.Variable((self.number_of_goals1, self.horizon), nonneg=True)
@@ -97,9 +92,9 @@ class MPC_cbf_multiple_goals:
         slack_terminal2_3 = cp.Variable((self.number_of_goals2), nonneg=True)
         slack_terminal2_4 = cp.Variable((self.number_of_goals2), nonneg=True)
 
-        slack_cost_weight = 10
+        slack_cost_weight = 500
         self.alpha_coll = 1.0
-        self.alpha_obs = 1.0
+        self.alpha_obs = 0.3
         time_interval = (0,self.step_to_reach_goal)
         switch = self.step_to_reach_goal+1
         gamma_goal1_1 = np.zeros((self.number_of_goals1, self.horizon+1))
@@ -162,17 +157,11 @@ class MPC_cbf_multiple_goals:
             constraints.append(self.x[:, k + 1] == x_next)
             constraints.append(self.u[:, k] >= self.u_min)
             constraints.append(self.u[:, k] <= self.u_max)
-            constraints.append(cp.abs(self.x[2, k]) <= v_max)
-            constraints.append(cp.abs(self.x[3, k]) <= v_max)
-            constraints.append(cp.abs(self.x[6, k]) <= v_max)
-            constraints.append(cp.abs(self.x[7, k]) <= v_max)
-            # Steering Angle Constraints for Non-Holonomic Motion
-            '''
-            constraints.append(self.x[3, k] >= tan_theta_min * self.x[2, k])  # Robot 1: vy ≥ tan(theta_min) * vx
-            constraints.append(self.x[3, k] <= tan_theta_max * self.x[2, k])  # Robot 1: vy ≤ tan(theta_max) * vx
-            constraints.append(self.x[7, k] >= tan_theta_min * self.x[6, k])  # Robot 2: vy ≥ tan(theta_min) * vx
-            constraints.append(self.x[7, k] <= tan_theta_max * self.x[6, k])  # Robot 2: vy ≤ tan(theta_max) * vx
-            '''
+            #constraints.append(cp.abs(self.x[2, k]) <= v_max)
+            #constraints.append(cp.abs(self.x[3, k]) <= v_max)
+            #constraints.append(cp.abs(self.x[6, k]) <= v_max)
+            #constraints.append(cp.abs(self.x[7, k]) <= v_max)
+
             # Goal reaching with cbf: b(x, t) = h(x) + gamma(t) >= 0
             for i in range(self.number_of_goals1):
                 dist_to_goal1_1 = self.x[0, k] - self.xG1[i,0]
@@ -221,8 +210,8 @@ class MPC_cbf_multiple_goals:
             constraints.append(h_collision >= 0)
             # Linearized Obstacle Avoidance CBF
             for i, obs in enumerate(self.obs_list):
-                obs_center = np.array([(obs[0] + obs[1]) / 2, (obs[2] + obs[3]) / 2])  # (x, y) center
-                obs_radius = (np.sqrt((obs[1] - obs[0])**2 + (obs[3] - obs[2])**2) / 2) + safe_dist_obs
+                obs_center = np.array([obs[0], obs[1]])  # (x, y) center
+                obs_radius = obs[2]  # radius
                 diff_obs_robot1 = self.x[0:2, k] - obs_center
                 d_obs_hat_robot1 = (self.parameter1_obs_robot1[k,(i*2):(i*2)+2]) @ (diff_obs_robot1) + self.parameter2_obs_robot1[k,i]
                 h_obs_robot1 = d_obs_hat_robot1 - obs_radius + self.alpha_obs * (d_obs_hat_robot1 - obs_radius)
@@ -354,7 +343,7 @@ class MPC_cbf_multiple_goals:
             parameter1_coll[k,:] = diff_pos_nom.T[k,:] / norm_diff_pos_nom[k]
             parameter2_coll[k] = - parameter1_coll[k,:] @ diff_pos_nom[:,k] + norm_diff_pos_nom[k]
             for i, obs in enumerate(self.obs_list):
-                obs_center = np.array([(obs[0] + obs[1]) / 2, (obs[2] + obs[3]) / 2])  # (x, y) center
+                obs_center = np.array([obs[0], obs[1]])  # (x, y) center
                 diff_obs_nom_robot1[(i*2):(i*2)+2,k] = x_prev[0:2, k] - obs_center
                 norm_diff_obs_nom_robot1[k,i] = np.linalg.norm(diff_obs_nom_robot1[(i*2):(i*2)+2,k]) + 1e-6 
                 parameter1_obs_robot1[k, (i*2):(i*2)+2] = diff_obs_nom_robot1.T[k,(i*2):(i*2)+2] / norm_diff_obs_nom_robot1[k,i]

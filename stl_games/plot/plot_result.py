@@ -8,7 +8,7 @@ from stl_games.collision.collision_handler import CollisionDetection
 class PlotResult:
     def __init__(self):
         pass
-    def __call__(self, x, x0, goal_list, number_of_goals, battery_list, number_of_robots, obstacle_bounds_list, safe_dist, eps):
+    def __call__(self, x, x0, goal_list, number_of_goals, number_of_robots, obstacles, safe_dist, eps, grid_size, battery_list=[]):
         plt.figure(figsize=(10, 6))
         robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
         robot_positions = []
@@ -31,7 +31,7 @@ class PlotResult:
             for i in range(len(goal_list)):
                 goal_x = goal_list[i][0]
                 goal_y = goal_list[i][1]
-                goal_size = eps  # Define the size of the square
+                goal_size = eps*2  # Define the size of the square
                 # Create a rectangle centered at (goal_x, goal_y) with the given size
                 # Rectangle(xy, width, height)
                 rect = Rectangle(
@@ -50,25 +50,15 @@ class PlotResult:
             for i in range(len(battery_list)-1):
                 plt.plot(battery_list[i][0], battery_list[i][1], marker='o', color='black')
             plt.plot(battery_list[-1][0], battery_list[-1][1], label="Battery", marker='o', color='black')
-        '''if (len(obstacle_bounds_list)>0):
-            for i in range(len(obstacle_bounds_list)):
-                x_vertices = (obstacle_bounds_list[i][0], obstacle_bounds_list[i][1], obstacle_bounds_list[i][1], obstacle_bounds_list[i][0], obstacle_bounds_list[i][0])
-                y_vertices = (obstacle_bounds_list[i][2], obstacle_bounds_list[i][2], obstacle_bounds_list[i][3], obstacle_bounds_list[i][3], obstacle_bounds_list[i][2])
-                plt.plot(x_vertices, y_vertices, linestyle='-', color='red')'''
+
         obstacle_legend_added = False
-        if len(obstacle_bounds_list) > 0:
-            for bounds in obstacle_bounds_list:
-                xmin, xmax, ymin, ymax = bounds
-
+        if len(obstacles) > 0:
+            for obs in obstacles:
                 # Compute center of the square
-                cx = (xmin + xmax) / 2.0
-                cy = (ymin + ymax) / 2.0
-
+                cx = obs[0]
+                cy = obs[1]
                 # Compute radius to enclose the square (half the diagonal)
-                dx = xmax - xmin
-                dy = ymax - ymin
-                radius = ((dx**2 + dy**2) ** 0.5) / 2.0
-
+                radius = obs[2]
                 # Plot the enclosing circle
                 circle = Circle((cx, cy), radius, color='red', fill=False)
                 if not obstacle_legend_added:
@@ -87,8 +77,8 @@ class PlotResult:
         plt.xlabel("X Position")
         plt.ylabel("Y Position")
         plt.legend(loc='upper right')
-        plt.xlim((-10,110))
-        plt.ylim((-10, 110))
+        plt.xlim((-grid_size/10,grid_size+grid_size/10))
+        plt.ylim((-grid_size/10,grid_size+grid_size/10))
         plt.grid(True)
         plt.show()
         return True

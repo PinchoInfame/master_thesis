@@ -8,6 +8,12 @@ class ComputeTrajectories:
         self.x = None
 
     def compute_y(self, x, u, number_of_robots):
+        if np.size(u, axis=1) == np.size(x, axis=1):
+            pass
+        elif np.size(u, axis=1) == np.size(x, axis=1)-1:
+            u = np.hstack((u, np.zeros((u.shape[0],1))))
+        else:
+            raise ValueError("The size of the control input does not match the size of the state trajectory")
         y = np.concatenate([x[0:4,:],u[0:2,:]])
         for i in range(1,number_of_robots):
             y = np.concatenate([y, x[(i*4):(i*4+4),:], u[(i*2):(i*2+2),:]])

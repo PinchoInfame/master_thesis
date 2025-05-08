@@ -26,8 +26,8 @@ class CollisionHandler:
                     self.input_to_be_modified.append(np.concatenate((u[(ind1*2):(ind1*2+2), t-delta_t:], u[(ind2*2):(ind2*2+2), t-delta_t:]), axis=0))
                     self.collision_times.append(t)
                     self.collision_indices.append((ind1, ind2))
-            #self.trajectory_to_be_modified = np.array(self.trajectory_to_be_modified)
-            #self.input_to_be_modified = np.array(self.input_to_be_modified)
+            self.trajectory_to_be_modified = np.array(self.trajectory_to_be_modified)
+            self.input_to_be_modified = np.array(self.input_to_be_modified)
             #self.collision_times = np.array(self.collision_times)
         else:
             print("No collision detected")

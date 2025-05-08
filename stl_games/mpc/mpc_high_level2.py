@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class MPCHighLevelPlanner:
-    def __init__(self, nx, nu, number_of_agents,  horizon, dt, u_min, u_max, safe_dist, position_tolerance, obs_list, step_to_reach_goal, list_xG):
+    def __init__(self, nx, nu, number_of_agents,  horizon, dt, u_min, u_max, position_tolerance, obs_list, step_to_reach_goal, list_xG):
         self.solver_time = 0
         self.horizon = horizon
         self.nx = nx    # number of states for each agent
@@ -14,7 +14,6 @@ class MPCHighLevelPlanner:
         self.u_max = u_max
         self.R = 0.1*np.eye(number_of_agents*nu)
         self.Q = 0.5*np.diag([0, 0, 1, 1] * (number_of_agents))
-        self.safe_dist = safe_dist
         self.position_tolerance = position_tolerance
         self.obs_list = obs_list
         self.number_of_obs = len(obs_list)
@@ -237,8 +236,8 @@ class MPCHighLevelPlanner:
         parameter2_obs = {i: np.zeros((self.number_of_obs)) for i in range(self.number_of_agents)}
         for i in range(self.number_of_agents):
             for j, obs in enumerate(self.obs_list):
-                obs_center = np.array([(obs[0] + obs[1]) / 2, (obs[2] + obs[3]) / 2])
-                obs_radius = np.sqrt(((obs[1] - obs[0]) / 2)**2 + ((obs[3] - obs[2]) / 2)**2)
+                obs_center = np.array([obs[0], obs[1]])
+                obs_radius = obs[2]
                 x0_i = x0[i*4:i*4+4]
                 #u0_i = self.u[i*2:i*2+2, 0]
                 Ap = np.array([[1, 0, self.dt, 0],

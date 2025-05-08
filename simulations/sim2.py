@@ -13,41 +13,42 @@ from stl_games.collision.collision_handler import CollisionHandler
 from stl_games.plot.plot_result import PlotResult
 from stl_games.trajectory.trajectory_handler import ComputeAdditionalPoints, AugmentControlInput, ComputeTrajectories
 from stl_games.mpc.mpc_cbf_linearized_multipleGoals import MPC_cbf_multiple_goals
+from stl_games.stl.compute_robustness import ComputeRobustness
 
 # Set random seed for reproducibility
-random.seed(11)
-number_of_robots = 4
+random.seed(4)
+number_of_robots = 3
 
 # Define parameters
-eps = 0.5
-T = 15
-safe_dist = 3
-safe_dist_obs = 1
-grid_size = 100
+eps = 2.0       # Tolerance for goal distance
+T = 15          # Time for reaching goal
+safe_dist = 3   # Safety distance from other robots
+safe_dist_obs = 1 # Safety distance from obstacles
+grid_size = 50
 
-# Define initial state and obstacles
-dt = 0.25
-obstacle_bounds_list = [
-    (15, 25, 30, 40),
-    (60, 70, 80, 90),
-    (5, 15, 50, 60),
-    (40, 50, 10, 20),
-    (70, 80, 20, 30),
-    (25, 35, 75, 85),
-    (85, 95, 55, 65)]
+# Define obstacles (x_min, x_max, y_min, y_max)
+obstacles = [(15, 38, 3), 
+                        (24, 8, 4), 
+                        (42, 41, 2), 
+                        (12, 15, 5), 
+                        (35, 30, 3), 
+                        (28, 45, 4)]
+
+# Define initial state of the robots
 generate_valid_pos = GenerateValidPositions()
-generate_valid_pos.generate_valid_start_positions(grid_size, number_of_robots, obstacle_bounds_list, safe_dist+1, safe_dist_obs+1)
+generate_valid_pos.generate_valid_start_positions(grid_size, number_of_robots, obstacles, safe_dist+1, safe_dist_obs+1)
 start_positions = generate_valid_pos.start_positions
 x0 = start_positions.flatten()
 
-number_of_goals_total = 4
-number_of_goals = ([1, 1, 1, 1])
+# Define number and positions of goals
+number_of_goals_total = 3
+number_of_goals = ([1, 1, 1])
 robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
 generate_valid_pos = GenerateValidPositions()
-generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, obstacle_bounds_list, safe_dist+1, safe_dist_obs+1)
+generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, number_of_robots, number_of_goals, obstacles, safe_dist+1, safe_dist_obs+1)
 goal_positions = generate_valid_pos.goal_positions
-goal_positions_array = np.array(goal_positions)
 
+# Define the linear system dynamics for each robot (double integrator model with dt=1 sec)
 Ad = np.array([[1, 0, 1, 0],  
                 [0, 1, 0, 1],  
                 [0, 0, 1, 0],  
@@ -72,25 +73,27 @@ system_a = LinearSystem(Ad, Bd, Cd, Dd)
 system_b = LinearSystem(Ad, Bd, Cd, Dd)
 system_c = LinearSystem(Ad, Bd, Cd, Dd)
 system_d = LinearSystem(Ad, Bd, Cd, Dd)
-subsystems = [system_a, system_b, system_c, system_d]
+subsystems = [system_a, system_b, system_c]
 dynamics = ProductDynamicalSystem()
 dynamics(subsystems)
 combined_system = dynamics.combined_system
 
+# Define STL specifications
+# goal distance specification
 goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(eps, goal_positions_array, number_of_goals, number_of_robots, T)
+goal_spec_(eps, goal_positions, number_of_goals, number_of_robots, T)
 goal_spec = goal_spec_.goal_distance_spec
-
+# obstacle avoidance specification
 obstacle_avoidance_spec_ = ObstacleAvoidanceSTLSpecs()
-obstacle_avoidance_spec_(obstacle_bounds_list, number_of_robots, T, safe_dist_obs)
+obstacle_avoidance_spec_(obstacles, number_of_robots, T, safe_dist_obs)
 obstacle_avoidance_spec = obstacle_avoidance_spec_.obstacle_avoidance_spec
-
-# Define STL specification for collision avoidance between robots
+# collision avoidance specification
 collision_avoidance_spec_ = CollisionAvoidanceSTLSpecs()
 for robot_ids_collision_avoidance in itertools.combinations(range(number_of_robots), 2):
     collision_avoidance_spec_(safe_dist, list(robot_ids_collision_avoidance), number_of_robots, T)
     collision_avoidance_spec = collision_avoidance_spec_.collision_avoidance_spec
 
+# Problem solved without collision avoidance with MILP encodings
 combined_spec = obstacle_avoidance_spec & goal_spec
 combined_spec.simplify()
 solver = GurobiMICPSolver(combined_spec, combined_system, x0, T)
@@ -100,16 +103,19 @@ solver.AddRobustnessCost()
 x, u, rho, solver_time = solver.Solve()
 
 plot = PlotResult()
-plt.figure(figsize=(10, 6))
-plot(x, x0, goal_positions_array, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list, safe_dist)
-plt.show()
+plot(x, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, eps, grid_size)
 
 if x is None:
     print("Solver failed")
     exit()
 
-# Modify trajectory to avoid collision with mpc receiding horizon approach
+# Modify computed trajectory to avoid collision with mpc+cbf
 start_time = time.time()
+dt = 0.5
+horizon_mpc = 20
+u_min = -5
+u_max = 5
+
 collision_handler = CollisionHandler()
 modified_trajectory_length = 4
 delta_t = modified_trajectory_length // 2
@@ -119,27 +125,19 @@ while (len(trajectory_to_be_modified_list)>0):
     trajectory_to_be_modified = collision_handler.trajectory_to_be_modified[0]
     input_to_be_modified = collision_handler.input_to_be_modified[0]
     time_of_collision = collision_handler.collision_times[0]
-    trajectory_to_be_modified = np.array(trajectory_to_be_modified)
-    input_to_be_modified = np.array(input_to_be_modified)
     collision_indices = collision_handler.collision_indices
     print("Time of collision: ", time_of_collision)
-    dt = 0.25
     additional_points = int((1/dt)-1)
     compute_additional_points = ComputeAdditionalPoints()
     compute_additional_points(trajectory_to_be_modified, input_to_be_modified, additional_points) 
     augmented_trajectory = compute_additional_points.augmented_trajectory
     augmented_input = compute_additional_points.augmented_input
+    nx = np.size(augmented_trajectory, axis=0)
+    nu = np.size(augmented_input, axis=0)
 
-    horizon_mpc = 10
     if horizon_mpc > np.size((augmented_trajectory),axis=1)-1:
         horizon_mpc = np.size((augmented_trajectory),axis=1)-1
 
-    nx = np.size(augmented_trajectory, axis=0)
-    nu = np.size(augmented_input, axis=0)
-    u_min = -5
-    u_max = 5
-    position_tolerance = eps
-    velocity_tolerance = 0.1
     step_to_reach_goal = np.size((augmented_trajectory),axis=1)-1
     x_prev = augmented_trajectory[:,:horizon_mpc+1]
     u_prev = augmented_input[:,:horizon_mpc]
@@ -156,16 +154,13 @@ while (len(trajectory_to_be_modified_list)>0):
     xG1_mpc = np.array(xG1_mpc)
     xG2_mpc = np.array(xG2_mpc)
     
-    mpc = MPC_cbf_multiple_goals(nx, nu, horizon_mpc, dt, u_min, u_max, safe_dist, position_tolerance, obstacle_bounds_list, step_to_reach_goal, xG1_mpc, xG2_mpc)
+    mpc = MPC_cbf_multiple_goals(nx, nu, horizon_mpc, dt, u_min, u_max, safe_dist, eps, obstacles, step_to_reach_goal, xG1_mpc, xG2_mpc)
     mpc.build_problem(x0_mpc, xG1_mpc, xG2_mpc)
 
     state_trajectory = [x0_mpc]
     control_trajectory = []
     x_current = x0_mpc
     max_iters_mpc = np.size((augmented_trajectory),axis=1)
-    print("Max iterations: ", max_iters_mpc)
-    #print("dt: ", dt)
-    #print("additional points: ", additional_points)
     for t in range(max_iters_mpc):
         u_opt, x_prev, u_prev = mpc.solve_mpc(x_current, xG1_mpc, xG2_mpc, x_prev, u_prev, t)
         if u_opt is None:
@@ -176,14 +171,6 @@ while (len(trajectory_to_be_modified_list)>0):
         control_trajectory.append(u_opt)
     state_trajectory = np.array(state_trajectory)
     control_trajectory = np.array(control_trajectory)
-    end_time = time.time()
-    print("Solver time: ", mpc.solver_time)
-    print("Robot1 velocity: ", np.max(np.abs(state_trajectory[:,2:4])))
-    print("Robot2 velocity: ", np.max(np.abs(state_trajectory[:,6:8])))
-    plt.figure(figsize=(10, 6))
-    plot(x, x0, goal_positions, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list, safe_dist)
-    plot(state_trajectory.T, x0_mpc, goal_list=[xG_mpc[0:2], xG_mpc[4:6]], robot_id_list_associated_goals=[0, 1], battery_list=[], number_of_robots=2, obstacle_bounds_list=[], safe_dist=safe_dist)
-    plt.show()
 
     if (np.size((u), axis=1))==T+1:
         augment_control_inputs = AugmentControlInput()
@@ -202,24 +189,20 @@ while (len(trajectory_to_be_modified_list)>0):
     compute_traj.compute_y(augmented_x, augmented_u, number_of_robots)
     augmented_y = compute_traj.y
 
-    plt.figure(figsize=(10, 6))
-    plot(augmented_x, x0, goal_positions, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list, safe_dist)
-    plt.show()
+    plot(augmented_x, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, eps, grid_size)
 
-    # Check robustness of augmented state trajectory (taking one element each 10)
+    # Check robustness of augmented state trajectory
     x_to_check_robustness = augmented_x[:, ::(additional_points+1)]
     num_groups = T
-    reshaped_matrix = augmented_u[:, :-1].reshape(8, num_groups, additional_points+1)
+    reshaped_matrix = augmented_u[:, :-1].reshape(2*number_of_robots, num_groups, additional_points+1)
     averaged_matrix = reshaped_matrix.mean(axis=2)
-    last_element = augmented_u[:, -1].reshape(8, 1)
+    last_element = augmented_u[:, -1].reshape(2*number_of_robots, 1)
     u_to_check_robustness = np.concatenate((averaged_matrix, last_element), axis=1)
     compute_traj.compute_y(x_to_check_robustness, u_to_check_robustness, number_of_robots)
     y_to_check_robustness = compute_traj.y
-    obstacle_avoidance_spec_final_ = ObstacleAvoidanceSTLSpecs()
-    obstacle_avoidance_spec_final_(obstacle_bounds_list, number_of_robots, T, eps)
-    obstacle_avoidance_spec_final = obstacle_avoidance_spec_final_.obstacle_avoidance_spec
+    compute_robustness = ComputeRobustness()
+    robustness_obs = compute_robustness.min_distance_to_obstacles(x_to_check_robustness, obstacles, number_of_robots)
     robustness_goal = goal_spec.robustness(y_to_check_robustness, 0)
-    robustness_obs = obstacle_avoidance_spec_final.robustness(y_to_check_robustness, 0)
     collision_avoidance_spec_list = []
     for robot_ids_collision_avoidance in itertools.combinations(range(number_of_robots), 2):
         collision_avoidance_spec_(safe_dist, list(robot_ids_collision_avoidance), number_of_robots, T)
@@ -235,9 +218,7 @@ while (len(trajectory_to_be_modified_list)>0):
     print('goal robustness: ', robustness_goal)
     print('obstacle robustness: ', robustness_obs)
     print('collision robustness: ', robustness_collision)
-    plt.figure(figsize=(10, 6))
-    plot(x_to_check_robustness, x0, goal_positions, robot_id_list_associated_goals, [], number_of_robots, obstacle_bounds_list, safe_dist)
-    plt.show()
+    plot(x_to_check_robustness, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, eps, grid_size)
 
     # Update the trajectory to be modified 
     collision_handler(x_to_check_robustness, u_to_check_robustness, number_of_robots, safe_dist, delta_t)
@@ -247,6 +228,7 @@ while (len(trajectory_to_be_modified_list)>0):
         u = augmented_u
     else:
         trajectory_to_be_modified_list = []
-    
+
+end_time = time.time()
 total_time = end_time-start_time
 print("Total execution time: ", total_time)

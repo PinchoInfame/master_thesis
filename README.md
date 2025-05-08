@@ -35,8 +35,8 @@ https://www.gurobi.com/academia/academic-program-and-licenses/
 ## Simulation Results
 
 ### sim1.py
-A control is sinthetized for a varying number of robots. The high-level behavior of each robot is specified using STL tasks. STL tasks include:
-- Obstacle avoidance: Robots must stay outside fixed circular obstacle regions.
-- Goal reaching: Robots must reach one of several available square goal areas within a specified time window. 
+A control is sinthetized for a varying number of robots, each of them governed by double integrator dynamics. The high-level behavior of each robot is specified using STL tasks. STL tasks include:
+- Obstacle avoidance: Robots must stay outside fixed obstacle regions.
+- Goal reaching: Robots must reach one of several available square goal areas within a specified time window.  
 Each robot is assigned a set of possible goals and must choose one to satisfy the STL specification. STL formula is in the form:  
 ![STL Formula](media/sim1-STLFragment.png)
