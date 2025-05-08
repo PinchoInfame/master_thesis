@@ -75,7 +75,7 @@ class MPCHighLevelPlanner:
 
         slack_cost_weight = 100
         rho = 1000
-        self.alpha_obs = 0.15
+        self.alpha_obs = 0.2
         gamma_goal1 = {i: np.zeros((len(self.list_xG[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.list_xG[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.list_xG[i]), self.horizon+1)) for i in range(self.number_of_agents)}
