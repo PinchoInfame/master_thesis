@@ -13,15 +13,17 @@ from stl_games.stl.compute_robustness import ComputeRobustness
 
 
 # Set random seed for reproducibility
-random.seed(1)
+random.seed(2)
 
 ##### PARAMETERS #####
-number_of_robots = 2
-eps = 2.0           # Tolerance for goal distance
+number_of_robots = 6
+goal_size = 2.0     # Goal square size
 T = 30              # Time for reaching goal
 safe_dist = 3       # Safety distance from other robots
 safe_dist_obs = 1   # Safety distance from obstacles
 grid_size = 100
+time_to_reach_goals = np.array((T, T, T, T, T, T))                       # Time each robot has to reach one goal
+
 
 ##### LINEAR SYSTEM #####
 # Define the linear system dynamics for each robot (double integrator model)
@@ -71,8 +73,8 @@ print("start positions: ", start_positions)
 x0 = start_positions.flatten()
 
 # Valid goal positions (not too close to obstacles or other goals)
-number_of_goals = ([2, 2])      # Number of goals for each robot
-number_of_goals_total = 4       # Total number of goals
+number_of_goals = ([2, 2, 2, 2, 2, 2])      # Number of goals for each robot
+number_of_goals_total = 12       # Total number of goals
 generate_valid_pos = GenerateValidPositions()
 generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, number_of_robots, number_of_goals, obstacles, safe_dist+1, safe_dist_obs+1)
 goal_positions = generate_valid_pos.goal_positions
@@ -88,14 +90,13 @@ nu = 2          # Number of control inputs (ax, ay) for each robot
 u_min = -3      # Minimum control input (acceleration)
 u_max = 3       # Maximum control input (acceleration)
 
-# Time each robot has to reach one goal
+
 additional_points = int((1/dt)-1)
-time_to_reach_goals = np.array((T, T, T))
-step_to_reach_goal = time_to_reach_goals*(1+additional_points)
+step_to_reach_goal = time_to_reach_goals*(1+additional_points)  # Number of steps to reach goal
 
 # Build MPC problem
 start_time = time.time()
-mpc = MPCHighLevelPlanner(nx, nu, number_of_robots, horizon_mpc, dt, u_min, u_max, eps, obstacles, step_to_reach_goal, xG)
+mpc = MPCHighLevelPlanner(nx, nu, number_of_robots, horizon_mpc, dt, u_min, u_max, goal_size, obstacles, step_to_reach_goal, xG)
 mpc.build_problem(x0)
 
 # Solve MPC in a receiding horizon fashion
@@ -103,15 +104,11 @@ state_trajectory = [x0]
 control_trajectory = []
 x_current = x0
 max_iters_mpc = (1+additional_points)*T
-u_opt, x_prev, u_prev = mpc.solve_mpc(x0, None, None, current_iteration=0)
-if u_opt is None:
-    print("Solver failed")
-    exit()
-x_current = mpc.define_dynamics(x0, u_opt)
-state_trajectory.append(x_current)
-control_trajectory.append(u_opt)
-for t in range(1, max_iters_mpc):
-    u_opt, x_prev, u_prev = mpc.solve_mpc(x_current, x_prev, u_prev, t)
+for t in range(max_iters_mpc):
+    if t == 0:
+        u_opt, x_prev, u_prev = mpc.solve_mpc(x_current, None, None, t)
+    else:
+        u_opt, x_prev, u_prev = mpc.solve_mpc(x_current, x_prev, u_prev, t)
     if u_opt is None:
         print("Solver failed")
         exit()
@@ -122,23 +119,25 @@ for t in range(1, max_iters_mpc):
 state_trajectory = np.array(state_trajectory).T
 control_trajectory = np.array(control_trajectory).T
 end_time = time.time()
-print("Solver time: ", mpc.solver_time)
 #print("Robot1 max velocity: ", np.max(np.abs(state_trajectory[2:4,:])))
 #print("Robot2 max velocity: ", np.max(np.abs(state_trajectory[6:8,:])))
 
 ##### RESULTS #####
-# Plotting trajectory
-plot = PlotResult()
-plot(state_trajectory, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, eps, grid_size)
+print("Solver time: ", mpc.solver_time)
 total_time = end_time-start_time
 print("Total execution time: ", total_time)
+#print("Robot1 max velocity: ", np.max(np.abs(state_trajectory[2:4,:])))
+#print("Robot2 max velocity: ", np.max(np.abs(state_trajectory[6:8,:])))
+# Plotting trajectory
+plot = PlotResult()
+plot(state_trajectory, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, goal_size, grid_size)
 
 # Analyze robustness of the resulting trajectory to STL specifications
 compute_traj = ComputeTrajectories()
 compute_traj.compute_y(state_trajectory, control_trajectory, number_of_robots)
-y = compute_traj.y
+y = compute_traj.y  # y = output of the system (states + inputs)
 goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(eps, goal_positions, number_of_goals, number_of_robots, y.shape[1]-1)
+goal_spec_(goal_size, goal_positions, number_of_goals, number_of_robots, y.shape[1]-1)
 goal_spec = goal_spec_.goal_distance_spec
 robustness_goal_reaching = goal_spec.robustness(y, 0)
 compute_robustness = ComputeRobustness()

@@ -5,7 +5,7 @@ class GoalDistanceSTLSpecs:
     def __init__(self):
         self.goal_distance_spec = None
         self.goal_distance_spec_list = []
-    def __call__(self, eps, goals_list, number_of_goals, number_of_robots, T):
+    def __call__(self, eps, goals_list, number_of_goals, number_of_robots, Time_list):
         if (len(goals_list)==0) or (number_of_goals==None) or (len(number_of_goals)==0):
             a_pred = np.zeros((1, number_of_robots*6))
             b_pred = 0
@@ -14,7 +14,7 @@ class GoalDistanceSTLSpecs:
             return -1           
         goal_predicates_ = GoalDistancePredicates()
         for i in range(number_of_robots):
-            goal_predicates_(eps, goals_list[0:number_of_goals[i]], i, number_of_robots, T)
+            goal_predicates_(eps, goals_list[0:number_of_goals[i]], i, number_of_robots, Time_list[i])
             goals_list = goals_list[number_of_goals[i]:]
             goal_predicates = goal_predicates_.predicates
             goal_distance_spec = goal_predicates[0]

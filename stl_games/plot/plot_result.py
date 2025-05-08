@@ -12,6 +12,7 @@ class PlotResult:
         plt.figure(figsize=(10, 6))
         robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
         robot_positions = []
+        colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
         for i in range(number_of_robots):
             robot_x=(x[i*4])
             robot_y=(x[(i*4)+1])
@@ -39,8 +40,8 @@ class PlotResult:
                     goal_size, goal_size,  # Width and height of the square
                     linewidth=0.1,
                     edgecolor='black',
-                    facecolor='green',  # Fill with green
-                    alpha=0.8,  # Transparency, you can adjust this
+                    facecolor=colors[robot_id_list_associated_goals[i]%len(colors)],  # Fill with green
+                    alpha=0.5,  # Transparency, you can adjust this
                     label = f"Goal {(robot_id_list_associated_goals[i])+1}"
                     )
 
