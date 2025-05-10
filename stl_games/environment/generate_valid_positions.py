@@ -7,15 +7,15 @@ class GenerateValidPositions_4States:
         self.start_positions = []
         self.goal_positions = []
     def generate_valid_start_positions(self, grid_size: int, num_positions: int, obstacles: list[tuple[float, float, float]], min_dist: float=0, min_dist_obs: float=0) -> np.ndarray:
-        """Generate valid start positions ensuring they are not inside obstacles and are not too close to each other.
-        Args:
-            grid_size (int): Size of the grid (assumed square).
-            num_positions (int): Number of start positions to generate.
-            obstacles (list): List of obstacles in the format [(x_centre, y_centre, radius), ...].
-            min_dist (float): Minimum distance between start positions.
-            min_dist_obs (float): Minimum distance from obstacles.
-        Returns:
-            start_positions (np.ndarray): Array of valid start positions in the format [(x, y, vx, vy), ...].
+        """
+        Generate valid start positions ensuring they are not inside obstacles and are not too close to each other.
+        
+            :param grid_size (int): Size of the grid (assumed square).
+            :param num_positions (int): Number of start positions to generate.
+            :param obstacles (list): List of obstacles in the format [(x_centre, y_centre, radius), ...].
+            :param min_dist (float): Minimum distance between start positions.
+            :param min_dist_obs (float): Minimum distance from obstacles.
+            :return start_positions (np.ndarray): Array of valid start positions in the format [(x, y, vx, vy), ...].
         """
         while len(self.start_positions) < num_positions:
             x, y = random.randint(0, grid_size - 1), random.randint(0, grid_size - 1)
@@ -29,17 +29,15 @@ class GenerateValidPositions_4States:
     def generate_valid_goal_positions(self, grid_size: int, num_positions: int, number_of_robots: int, number_of_goals: list[int], obstacles: list[tuple[float, float, float]], min_dist: float=0, min_dist_obs: float=0):
         """
         Generate goal positions ensuring they are not inside obstacles and are not too close to each other.
-        Args:
-            grid_size (int): Size of the grid (assumed square).
-            num_positions (int): Total number of goal positions to generate.
-            number_of_robots (int): Number of robots.
-            number_of_goals (list): List of number of goals for each robot.
-            obstacles (list): List of obstacles in the format [(x_centre, y_centre, radius), ...].
-            min_dist (float): Minimum distance between goal positions.
-            min_dist_obs (float): Minimum distance from obstacles.
-        Returns:
-            goal_positions (np.ndarray): Array of valid goal positions in the format [(x, y, vx, vy), ...].
-            goal_list (list): List of goal positions for each agent in the format [[[xᵢⱼ, yᵢⱼ, vxᵢⱼ, vyᵢⱼ] for j in goals_i] for i in robots].
+            :param grid_size (int): Size of the grid (assumed square).
+            :param num_positions (int): Total number of goal positions to generate.
+            :param number_of_robots (int): Number of robots.
+            :param number_of_goals (list): List of number of goals for each robot.
+            :param obstacles (list): List of obstacles in the format [(x_centre, y_centre, radius), ...].
+            :param min_dist (float): Minimum distance between goal positions.
+            :param min_dist_obs (float): Minimum distance from obstacles.
+            :return goal_positions (np.ndarray): Array of valid goal positions in the format [(x, y, vx, vy), ...].
+            :return goal_list (list): List of goal positions for each agent in the format [[[xᵢⱼ, yᵢⱼ, vxᵢⱼ, vyᵢⱼ] for j in goals_i] for i in robots].
         """
         while len(self.goal_positions) < num_positions:
             x, y = random.randint(0, grid_size - 1), random.randint(0, grid_size - 1)

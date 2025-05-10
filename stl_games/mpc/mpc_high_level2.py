@@ -11,7 +11,7 @@ class MPCHighLevelPlanner:
         '''
         A controller class for computing optimal trajectories using Model Predictive Control (MPC)
         integrated with Control Barrier Functions (CBFs) and time-varying sets.
-        
+
         :param nx: Number of states for each agent (e.g., x, y, vx, vy)
         :param nu: Number of inputs for each agent (e.g., ax, ay)
         :param number_of_agents: Number of agents
@@ -54,7 +54,14 @@ class MPCHighLevelPlanner:
         self.parameter1_obs = {i: cp.Parameter((2*self.number_of_obs)) for i in range(self.number_of_agents)}
         self.parameter2_obs = {i: cp.Parameter((self.number_of_obs)) for i in range(self.number_of_agents)}
 
-    def define_dynamics(self, state, input):
+    def define_dynamics(self, state: np.ndarray, input: np.ndarray) -> np.ndarray:
+        '''
+        Compute the next state of the multi-agent system using discretized double integrator dynamics.
+
+        :param state: Current state vector of all agents, flattened as a 1D array
+        :param input: Control input vector for all agents, flattened as a 1D array
+        :return: Flattened next state vector after applying control input.
+        '''
         dt = self.dt
         Ad = np.array([[1, 0, dt, 0],  
                        [0, 1, 0, dt],  
@@ -72,7 +79,7 @@ class MPCHighLevelPlanner:
 
     def build_problem(self, x0: np.ndarray):
         '''
-        :param x0: Initial state of the system (flattened array of states for all agents)
+        :param x0: Initial state of the system, flattened as a 1D array
         '''
         xG = np.zeros((4 * self.number_of_agents))  # Stores the closest goal for each agent
         closest_goals_indices = self.find_closest_goals(x0)
@@ -222,9 +229,9 @@ class MPCHighLevelPlanner:
 
     def solve_mpc(self, x0: np.ndarray, x_prev: np.ndarray=None, u_prev: np.ndarray=None, current_iteration:int=0):
         '''
-        :param x0: Initial state of the system (flattened array of states for all agents)
-        :param x_prev: Previous state trajectory (flattened array of states for all agents)
-        :param u_prev: Previous control trajectory (flattened array of control inputs for all agents)
+        :param x0: Initial state of the system (flattened as a 1D array)
+        :param x_prev: Previous state trajectory (used for warm-starting the optimization)
+        :param u_prev: Previous control trajectory (used for warm-starting the optimization)
         :param current_iteration: Current iteration number (used for time-varying sets)
         '''
         self.x0.value = x0

@@ -1,13 +1,25 @@
 import numpy as np
 
 class ComputeTrajectories:
+    """
+    Class to compute the trajectory of the robots based on the system dynamics and control inputs.
+    """
     def __init__(self):
         self.y = None
         self.augmented_y = None
         self.augmented_u = None
         self.x = None
 
-    def compute_y(self, x, u, number_of_robots):
+    def compute_y_concatenate(self, x: np.ndarray, u: np.ndarray, number_of_robots: int):
+        """
+        Compute the output as a concatenation of the state trajectory and control inputs.
+
+        :param x: State trajectory of the robots (array of shape (nx*number_of_robots, number_of_steps)).
+        :param u: Control input trajectory (array of shape (nu*number_of_robots, number_of_steps)).
+        :param number_of_robots: Number of robots.
+
+        :return: y: Output trajectory (array of shape ((nu+nx)*number_of_robots, number_of_steps)).
+        """
         if np.size(u, axis=1) == np.size(x, axis=1):
             pass
         elif np.size(u, axis=1) == np.size(x, axis=1)-1:
@@ -20,6 +32,7 @@ class ComputeTrajectories:
         #if np.size(u, axis=1) == np.size(x, axis=1):
         #    y = y[:,:-1]
         self.y = y
+        return self.y
 
     def compute_augmented_y(self, x, x0, u, combined_system, additional_points, dt, number_of_robots):
         # collision times contains indices of the robots which collide and time at which they collide

@@ -123,15 +123,13 @@ print("Total execution time: ", total_time)
 #print("Robot2 max velocity: ", np.max(np.abs(state_trajectory[6:8,:])))
 # Plotting trajectory
 plot = PlotResult()
-plot(state_trajectory, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, goal_size, grid_size)
+plot.plot_sim(state_trajectory, x0, goal_positions, number_of_goals, number_of_robots, obstacles, safe_dist, goal_size, grid_size)
 
 # Analyze robustness of the resulting trajectory to STL specifications
 compute_traj = ComputeTrajectories()
-compute_traj.compute_y(state_trajectory, control_trajectory, number_of_robots)
-y = compute_traj.y  # y = output of the system (states + inputs)
-goal_spec_ = GoalDistanceSTLSpecs()
-goal_spec_(goal_size, goal_positions, number_of_goals, number_of_robots, step_to_reach_goal)
-goal_spec = goal_spec_.goal_distance_spec
+y = compute_traj.compute_y_concatenate(state_trajectory, control_trajectory, number_of_robots) # y = output of the system (states + inputs)
+goal_spec_handler = GoalDistanceSTLSpecs()
+goal_spec = goal_spec_handler.compute_stl_spec_square(goal_size, goal_positions, number_of_goals, number_of_robots, step_to_reach_goal)
 robustness_goal_reaching = goal_spec.robustness(y, 0)
 compute_robustness = ComputeRobustness()
 min_dist = compute_robustness.min_distance_to_obstacles(state_trajectory, obstacles, number_of_robots)

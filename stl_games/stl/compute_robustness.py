@@ -1,10 +1,22 @@
 import numpy as np
 
 class ComputeRobustness:
+    """
+    Class to compute the robustness of a given trajectory to non-linear STL specs.
+    """
     def __init__(self):
         pass
     
-    def min_distance_to_obstacles(self, trajectories, obstacles, number_of_robots):
+    def min_distance_to_obstacles(self, trajectories: np.ndarray, obstacles: list[tuple[float, float, float]], number_of_robots: int) -> float:
+        """
+        Compute the minimum distance from the robot trajectories to the obstacles.
+
+        :param trajectories: State trajectory of the robots (array of shape (nx*number_of_robots, number_of_steps)).
+        :param obstacles: List of obstacles in the format [(x_centre, y_centre, radius), ...].
+        :param number_of_robots: Number of robots.
+
+        :return: Minimum distance to the obstacles.
+        """
         min_distance = float('inf')
 
         for i in range(number_of_robots):

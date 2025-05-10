@@ -6,9 +6,26 @@ import itertools
 from stl_games.collision.collision_handler import CollisionDetection
 
 class PlotResult:
+    """
+    Class to plot the results of the simulation, including robot trajectories, goals, and obstacles.
+    """
     def __init__(self):
         pass
-    def __call__(self, x, x0, goal_list, number_of_goals, number_of_robots, obstacles, safe_dist, eps, grid_size, battery_list=[]):
+    def plot_sim(self, x: np.ndarray, x0: np.ndarray, goal_list: list[tuple[float, float]], number_of_goals: list[int], number_of_robots: int, obstacles: list[tuple[float, float, float]], safe_dist: float, goal_size: float, grid_size: int, battery_list: list[tuple[float, float]] =[]):
+        '''
+        Plot the results of the simulation.
+        
+        :param x: State trajectory of the robots (array of shape (nx*number_of_robots, number_of_steps)).
+        :param x0: Initial state of the robots (flattened).
+        :param goal_list: List of goal positions (ordered as indicated by number_of_goals).
+        :param number_of_goals: Number of goals for each robot.
+        :param number_of_robots: Number of robots.
+        :param obstacles: List of obstacles in the format [(x_centre, y_centre, radius), ...].
+        :param safe_dist: Safety distance between robots.
+        :param goal_size: Size of the goal area (square).
+        :param grid_size: Size of the grid (assumed square).
+        :param battery_list: List of battery positions (optional).
+        '''
         plt.figure(figsize=(10, 6))
         robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
         robot_positions = []
@@ -32,12 +49,12 @@ class PlotResult:
             for i in range(len(goal_list)):
                 goal_x = goal_list[i][0]
                 goal_y = goal_list[i][1]
-                goal_size = eps*2  # Define the size of the square
+                eps = goal_size*2  # Define the size of the square
                 # Create a rectangle centered at (goal_x, goal_y) with the given size
                 # Rectangle(xy, width, height)
                 rect = Rectangle(
-                    (goal_x - goal_size / 2, goal_y - goal_size / 2),  # Bottom-left corner of the square
-                    goal_size, goal_size,  # Width and height of the square
+                    (goal_x - eps / 2, goal_y - eps / 2),  # Bottom-left corner of the square
+                    eps, eps,  # Width and height of the square
                     linewidth=0.1,
                     edgecolor='black',
                     facecolor=colors[robot_id_list_associated_goals[i]%len(colors)],  # Fill with green

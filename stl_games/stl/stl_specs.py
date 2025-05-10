@@ -2,10 +2,24 @@ import numpy as np
 from stlpy.STL import LinearPredicate
 
 class GoalDistanceSTLSpecs:
+    """
+    Class to compute the STL specifications for linear goal reaching.
+    """
     def __init__(self):
         self.goal_distance_spec = None
         self.goal_distance_spec_list = []
-    def __call__(self, eps, goals_list, number_of_goals, number_of_robots, Time_list):
+    def compute_stl_spec_square(self, goal_size: float, goals_list: list[tuple[float, float, float, float]], number_of_goals: list[int], number_of_robots: int, Time_list: list[int]):
+        """
+        Compute the STL specifications for reaching a square goal area within a certain time.
+
+        :param goal_size: Size of the goal area (square).
+        :param goals_list: List of goal positions for each robot (ordered as indicated by number_of_goals).
+        :param number_of_goals: Number of goals for each robot.
+        :param number_of_robots: Number of robots.
+        :param Time_list: List of time to reach the goal for each robot.
+
+        :return: STL specification for goal distance.
+        """
         if (len(goals_list)==0) or (number_of_goals==None) or (len(number_of_goals)==0):
             a_pred = np.zeros((1, number_of_robots*6))
             b_pred = 0
@@ -14,7 +28,7 @@ class GoalDistanceSTLSpecs:
             return -1           
         goal_predicates_ = GoalDistancePredicates()
         for i in range(number_of_robots):
-            goal_predicates_(eps, goals_list[0:number_of_goals[i]], i, number_of_robots, Time_list[i])
+            goal_predicates_(goal_size, goals_list[0:number_of_goals[i]], i, number_of_robots, Time_list[i])
             goals_list = goals_list[number_of_goals[i]:]
             goal_predicates = goal_predicates_.predicates
             goal_distance_spec = goal_predicates[0]
@@ -27,11 +41,12 @@ class GoalDistanceSTLSpecs:
         self.goal_distance_spec = self.goal_distance_spec_list[0]
         for i in range(1, len(self.goal_distance_spec_list)):
             self.goal_distance_spec = self.goal_distance_spec & self.goal_distance_spec_list[i]
+        return self.goal_distance_spec
 
 class GoalDistancePredicates:
     def __init__(self):
         self.predicates = None
-    def __call__(self, eps, goals_list, robot_id, number_of_robots, T):
+    def __call__(self, goal_size, goals_list, robot_id, number_of_robots, T):
         self.predicates = []
         for i in range(len(goals_list)):
             px_goal = goals_list[i][0]
@@ -39,19 +54,19 @@ class GoalDistancePredicates:
 
             a_pred1 = np.zeros((1, number_of_robots*6))
             a_pred1[0,0+robot_id*6]=-1
-            b_pred1 = -px_goal-eps
+            b_pred1 = -px_goal-goal_size
 
             a_pred2 = np.zeros((1, number_of_robots*6))
             a_pred2[0,0+robot_id*6]=1
-            b_pred2 = px_goal-eps
+            b_pred2 = px_goal-goal_size
 
             a_pred3 = np.zeros((1, number_of_robots*6))
             a_pred3[0,1+robot_id*6]=-1
-            b_pred3 = -py_goal-eps
+            b_pred3 = -py_goal-goal_size
 
             a_pred4 = np.zeros((1, number_of_robots*6))
             a_pred4[0,1+robot_id*6]=1
-            b_pred4 = py_goal-eps
+            b_pred4 = py_goal-goal_size
 
             left = LinearPredicate(a_pred1, b_pred1)
             right = LinearPredicate(a_pred2, b_pred2)
@@ -64,7 +79,7 @@ class GoalDistancePredicates:
 class ObstacleAvoidanceSTLSpecs:
     def __init__(self):
         self.obstacle_avoidance_spec = None
-    def __call__(self, obstacles, number_of_robots, T, eps=0):
+    def __call__(self, obstacles, number_of_robots, T, goal_size=0):
         predicate_list = []
         number_of_obstacles = len(obstacles)
         for i in range(number_of_obstacles):
@@ -76,19 +91,19 @@ class ObstacleAvoidanceSTLSpecs:
             for j in range(number_of_robots):
                 a_pred1 = np.zeros((1, number_of_robots*6))
                 a_pred1[0,0+j*6]=-1
-                b_pred1 = -x_min_obs+eps
+                b_pred1 = -x_min_obs+goal_size
 
                 a_pred2 = np.zeros((1, number_of_robots*6))
                 a_pred2[0,0+j*6]=1
-                b_pred2 = x_max_obs+eps
+                b_pred2 = x_max_obs+goal_size
 
                 a_pred3 = np.zeros((1, number_of_robots*6))
                 a_pred3[0,1+(j*6)]=-1
-                b_pred3 = -y_min_obs+eps
+                b_pred3 = -y_min_obs+goal_size
 
                 a_pred4 = np.zeros((1, number_of_robots*6))
                 a_pred4[0,1+(j*6)]=1
-                b_pred4 = y_max_obs+eps
+                b_pred4 = y_max_obs+goal_size
 
                 predicate1 = LinearPredicate(a_pred1, b_pred1)
                 predicate2 = LinearPredicate(a_pred2, b_pred2)
