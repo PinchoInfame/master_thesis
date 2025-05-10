@@ -1,16 +1,14 @@
 import numpy as np
 import random
 import time
-import matplotlib.pyplot as plt
 from stlpy.systems import LinearSystem
 
-from stl_games.environment.generate_valid_positions import GenerateValidPositions
+from stl_games.environment.generate_valid_positions import GenerateValidPositions_4States
 from stl_games.trajectory.trajectory_handler import ComputeTrajectories
-from stl_games.stl.stl_specs import ObstacleAvoidanceSTLSpecs, GoalDistanceSTLSpecs
+from stl_games.stl.stl_specs import GoalDistanceSTLSpecs
 from stl_games.mpc.mpc_high_level2 import MPCHighLevelPlanner
 from stl_games.plot.plot_result import PlotResult
 from stl_games.stl.compute_robustness import ComputeRobustness
-from stl_games.collision.collision_handler import CollisionHandler
 
 
 # Set random seed for reproducibility
@@ -63,20 +61,16 @@ obstacles = [   (31, 84, 9), (67, 29, 8),
                 (60, 35, 7), (30, 20, 5)]
 
 # Valid start positions (not too close to obstacles or to other robots)
-generate_valid_pos = GenerateValidPositions()
-generate_valid_pos.generate_valid_start_positions(grid_size, number_of_robots, obstacles, safe_dist+1, safe_dist_obs+1)
-start_positions = generate_valid_pos.start_positions
+generate_valid_pos = GenerateValidPositions_4States()
+start_positions = generate_valid_pos.generate_valid_start_positions(grid_size, number_of_robots, obstacles, safe_dist+1, safe_dist_obs+1)
 print("start positions: ", start_positions)
 x0 = start_positions.flatten()
 
 # Valid goal positions (not too close to obstacles or other goals)
 number_of_goals = ([2, 2, 2, 2])      # Number of goals for each robot
 number_of_goals_total = 8       # Total number of goals
-generate_valid_pos = GenerateValidPositions()
-generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, number_of_robots, number_of_goals, obstacles, safe_dist+1, safe_dist_obs+1)
-goal_positions = generate_valid_pos.goal_positions
-xG = generate_valid_pos.xG
-print("goal positions for each robot: ", xG)
+goal_positions, goal_list = generate_valid_pos.generate_valid_goal_positions(grid_size, number_of_goals_total, number_of_robots, number_of_goals, obstacles, safe_dist+1, safe_dist_obs+1)
+print("goal positions for each robot: ", goal_list)
 
 ##### MPC #####
 # Parameters
@@ -93,7 +87,7 @@ step_to_reach_goal = time_to_reach_goals*(1+additional_points)  # Number of step
 
 # Build MPC problem
 start_time = time.time()
-mpc = MPCHighLevelPlanner(nx, nu, number_of_robots, horizon_mpc, dt, u_min, u_max, goal_size, obstacles, step_to_reach_goal, xG)
+mpc = MPCHighLevelPlanner(nx, nu, number_of_robots, horizon_mpc, dt, u_min, u_max, goal_size, obstacles, step_to_reach_goal, goal_list)
 mpc.build_problem(x0)
 
 # Solve MPC in a receiding horizon fashion
@@ -116,8 +110,9 @@ for t in range(max_iters_mpc):
 state_trajectory = np.array(state_trajectory).T
 control_trajectory = np.array(control_trajectory).T
 end_time = time.time()
-#print("Robot1 max velocity: ", np.max(np.abs(state_trajectory[2:4,:])))
-#print("Robot2 max velocity: ", np.max(np.abs(state_trajectory[6:8,:])))
+print(state_trajectory.shape)
+print(control_trajectory.shape)
+exit()
 
 ##### RESULTS #####
 print("Solver time: ", mpc.solver_time)
