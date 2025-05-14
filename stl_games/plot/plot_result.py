@@ -3,7 +3,7 @@ from matplotlib.patches import Circle, Rectangle
 import numpy as np
 import itertools
 
-from stl_games.collision.collision_handler import CollisionDetection
+from stl_games.collision.collision_handler import CollisionHandler
 
 class PlotResult:
     """
@@ -83,10 +83,8 @@ class PlotResult:
                     circle.set_label('Obstacle Area')
                     obstacle_legend_added = True
                 plt.gca().add_patch(circle)
-        collision_detection = CollisionDetection()
-        collision_detection(x, number_of_robots, safe_dist)
-        collision_points_x = collision_detection.collision_points_x_plot
-        collision_points_y = collision_detection.collision_points_y_plot
+        collision_handler = CollisionHandler()
+        _, _, collision_points_x, collision_points_y = collision_handler.detect_collision(x, number_of_robots, safe_dist)
         if len(collision_points_x)>0:
             for i in range(len(collision_points_x)-1):
                 plt.scatter(collision_points_x[i], collision_points_y[i], color='red', zorder=5, marker='X')

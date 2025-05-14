@@ -3,46 +3,40 @@ import numpy as np
 
 class CollisionHandler:
     def __init__(self):
-        self.trajectories_to_be_modified=[]
-        self.input_to_be_modified = []
-        self.collision_times = []
-        self.collision_detected = False
-        self.collision_indices = []
-    def __call__(self, x, u, number_of_robots, safe_dist, delta_t):
-        self.trajectories_to_be_modified=[]
-        self.input_to_be_modified = []
-        self.collision_times = []
-        self.collision_detected = False
-        self.collision_indices = []
-        collision_detection = CollisionDetection()
-        collision_detection(x, number_of_robots, safe_dist)
-        if collision_detection.collision_detected:
+        pass
+    def handle_collision(self, x, u, number_of_robots, safe_dist, delta_t=2):
+        trajectories_to_be_modified=[]
+        input_to_be_modified = []
+        steps_of_collision = []
+        collision_detected = False
+        collision_indices = []
+        collision_detected, collisions, _, _ = self.detect_collision(x, number_of_robots, safe_dist)
+        if collision_detected:
             print("Collision detected")
-            self.collision_detected = True
-            collisions = collision_detection.collision_times
             for (ind1, ind2, t) in collisions:
-                if t>=2:
-                    self.trajectories_to_be_modified.append(np.concatenate((x[(ind1*4):(ind1*4+4), (t-delta_t):], x[(ind2*4):(ind2*4+4), (t-delta_t):]), axis=0))
-                    self.input_to_be_modified.append(np.concatenate((u[(ind1*2):(ind1*2+2), t-delta_t:], u[(ind2*2):(ind2*2+2), t-delta_t:]), axis=0))
-                    self.collision_times.append(t)
-                    self.collision_indices.append((ind1, ind2))
-            #self.trajectories_to_be_modified = np.array(self.trajectories_to_be_modified)
-            #self.input_to_be_modified = np.array(self.input_to_be_modified)
-            #self.collision_times = np.array(self.collision_times)
+                if t>=delta_t:
+                    trajectories_to_be_modified.append(np.concatenate((x[(ind1*4):(ind1*4+4), (t-delta_t):], x[(ind2*4):(ind2*4+4), (t-delta_t):]), axis=0))
+                    input_to_be_modified.append(np.concatenate((u[(ind1*2):(ind1*2+2), t-delta_t:], u[(ind2*2):(ind2*2+2), t-delta_t:]), axis=0))
+                    steps_of_collision.append(t)
+                    collision_indices.append((ind1, ind2))
+                else:
+                    trajectories_to_be_modified.append(np.concatenate((x[(ind1*4):(ind1*4+4), :], x[(ind2*4):(ind2*4+4), :]), axis=0))
+                    input_to_be_modified.append(np.concatenate((u[(ind1*2):(ind1*2+2), :], u[(ind2*2):(ind2*2+2), :]), axis=0))
+                    steps_of_collision.append(t)
+                    collision_indices.append((ind1, ind2))
         else:
             print("No collision detected")
-            self.collision_detected = False
-            self.trajectories_to_be_modified = []
-            self.input_to_be_modified = []
-
-class CollisionDetection:
-    def __init__(self):
-        self.collision_points_x_plot = []
-        self.collision_points_y_plot = []
-        self.collision_times = []
-        self.collision_detected = False
-    def __call__(self, x, number_of_robots, safe_dist):
+            collision_detected = False
+            trajectories_to_be_modified = []
+            input_to_be_modified = []
+        return collision_detected, trajectories_to_be_modified, input_to_be_modified, steps_of_collision, collision_indices
+    
+    def detect_collision(self, x, number_of_robots, safe_dist):
         robot_positions = []
+        steps_of_collision = []
+        collision_detected = False
+        collision_points_x_plot = []
+        collision_points_y_plot = []
         for i in range(number_of_robots):
             robot_x=(x[i*4])
             robot_y=(x[(i*4)+1])
@@ -53,11 +47,12 @@ class CollisionDetection:
             #collision_check = np.sqrt((robot1_x - robot2_x)**2 + (robot1_y - robot2_y)**2) < safe_dist
             collision_check = (np.abs(robot1_x-robot2_x)<safe_dist) & (np.abs(robot1_y-robot2_y)<safe_dist)
             if (np.any(collision_check)):
-                self.collision_detected = True
-                self.collision_times.append((robot1_index, robot2_index, np.where(collision_check==True)[0][0]))
-            self.collision_points_x_plot.append((robot1_x[collision_check] + robot2_x[collision_check])/2)
-            self.collision_points_y_plot.append((robot1_y[collision_check] + robot2_y[collision_check])/2)
-        self.collision_times = np.array(self.collision_times)
+                collision_detected = True
+                steps_of_collision.append((robot1_index, robot2_index, np.where(collision_check==True)[0][0]))
+            collision_points_x_plot.append((robot1_x[collision_check] + robot2_x[collision_check])/2)
+            collision_points_y_plot.append((robot1_y[collision_check] + robot2_y[collision_check])/2)
+        steps_of_collision = np.array(steps_of_collision)
+        return collision_detected, steps_of_collision, collision_points_x_plot, collision_points_y_plot
 
 class CheckCloseObstacles:
     def __init__(self, number_of_robots, obstacles, threshold):

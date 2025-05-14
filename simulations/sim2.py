@@ -6,7 +6,7 @@ from stlpy.systems import LinearSystem
 from stl_games.environment.generate_valid_positions import GenerateValidPositions_4States
 from stl_games.trajectory.trajectory_handler import ComputeTrajectories
 from stl_games.stl.stl_specs import GoalDistanceSTLSpecs
-from stl_games.mpc.mpc_high_level2 import MPCHighLevelPlanner
+from stl_games.mpc.mpc_high_level import MPCHighLevelPlanner
 from stl_games.plot.plot_result import PlotResult
 from stl_games.stl.compute_robustness import ComputeRobustness
 

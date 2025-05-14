@@ -79,7 +79,7 @@ class GoalDistancePredicates:
 class ObstacleAvoidanceSTLSpecs:
     def __init__(self):
         self.obstacle_avoidance_spec = None
-    def __call__(self, obstacles, number_of_robots, T, goal_size=0):
+    def compute_stl_obs_spec(self, obstacles, number_of_robots, T, goal_size=0):
         predicate_list = []
         number_of_obstacles = len(obstacles)
         for i in range(number_of_obstacles):
@@ -116,6 +116,7 @@ class ObstacleAvoidanceSTLSpecs:
         for pred in predicate_list[1:]:
             self.obstacle_avoidance_spec = self.obstacle_avoidance_spec & pred
         self.obstacle_avoidance_spec.simplify()
+        return self.obstacle_avoidance_spec
 
 class CollisionAvoidanceSTLSpecs:
     def __init__(self):
