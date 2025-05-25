@@ -11,7 +11,7 @@ class PlotResult:
     """
     def __init__(self):
         pass
-    def plot_sim(self, x: np.ndarray, x0: np.ndarray, goal_list: list[tuple[float, float]], number_of_goals: list[int], number_of_robots: int, obstacles: list[tuple[float, float, float]], safe_dist: float, goal_size: float, grid_size: int, battery_list: list[tuple[float, float]] =[]):
+    def plot_sim(self, x: np.ndarray, x0: np.ndarray, goal_list: list[tuple[float, float]], number_of_goals: list[int], number_of_robots: int, obstacles: list[tuple[float, float, float]], safe_dist: float, goal_size: float, grid_size: int, battery_list: list[tuple[float, float]] =[], dense_state_array: np.ndarray = None):
         '''
         Plot the results of the simulation.
         
@@ -30,16 +30,19 @@ class PlotResult:
         robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
         robot_positions = []
         colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
-        for i in range(number_of_robots):
-            robot_x=(x[i*4])
-            robot_y=(x[(i*4)+1])
-            x_0 = x0[i*4]
-            y_0 = x0[(i*4)+1]
-            robot_label = f"Robot {i+1}"
-            plt.plot(robot_x, robot_y, label=robot_label, linestyle='-', marker='o')
-            plt.plot(x_0, y_0, marker='o', color='black')
-            robot_positions.append((robot_x, robot_y))
-        plt.plot(x_0, y_0, label="start", marker='o', color='black')
+        if dense_state_array is not None:
+            self.plot_dense_trajectory(dense_state_array, number_of_robots)
+        else:
+            for i in range(number_of_robots):
+                robot_x=(x[i*4])
+                robot_y=(x[(i*4)+1])
+                x_0 = x0[i*4]
+                y_0 = x0[(i*4)+1]
+                robot_label = f"Robot {i+1}"
+                plt.plot(robot_x, robot_y, label=robot_label, linestyle='-', marker='o')
+                plt.plot(x_0, y_0, marker='o', color='black')
+                robot_positions.append((robot_x, robot_y))
+            plt.plot(x_0, y_0, label="start", marker='o', color='black')
         '''
         if len(goal_list)>0:
             for i in range(len(goal_list)):
@@ -98,3 +101,20 @@ class PlotResult:
         plt.grid(True)
         plt.show()
         return True
+    
+    def plot_dense_trajectory(self, dense_state_array: np.ndarray, number_of_robots: int):
+        """
+        Plot the dense trajectory of the robots.
+        
+        :param dense_state_array: Dense state array of shape (time_steps, nx * N).
+        :param number_of_robots: Number of robots.
+        """
+        for i in range(number_of_robots):
+            # Indices for this robot in the flat state vector
+            idx_x = 4 * i
+            idx_y = 4 * i + 1
+
+            x_pos = dense_state_array[idx_x, :]
+            y_pos = dense_state_array[idx_y, :]
+
+            plt.plot(x_pos, y_pos, label=f'Robot {i+1}')
