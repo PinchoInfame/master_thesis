@@ -8,7 +8,7 @@ class MPCCollisionAvoidance:
     A controller class for computing optimal trajectories using Model Predictive Control (MPC)
     integrated with Control Barrier Functions (CBFs) and time-varying sets.
     '''
-    def __init__(self, nx: int, nu: int, number_of_agents: int,  horizon: int, dt: float, u_min: float, u_max: float, goal_area_size: float, obs_list: list[tuple[float, float, float]], step_to_reach_goal: np.ndarray, goal_list: list[list[list[float]]], safe_dist: float=1.5):
+    def __init__(self, nx: int, nu: int, number_of_agents: int,  horizon: int, dt: float, goal_area_size: float, obs_list: list[tuple[float, float, float]], step_to_reach_goal: np.ndarray, goal_list: list[list[list[float]]], safe_dist: float=1.5):
         '''
         A controller class for computing optimal trajectories using Model Predictive Control (MPC)
         integrated with Control Barrier Functions (CBFs) and time-varying sets.
@@ -18,8 +18,6 @@ class MPCCollisionAvoidance:
         :param number_of_agents: Number of agents
         :param horizon: Prediction horizon for the MPC
         :param dt: Time step for the MPC
-        :param u_min: Minimum control input (e.g., acceleration)
-        :param u_max: Maximum control input (e.g., acceleration)
         :param goal_area_size: Size of the square goal area
         :param obs_list: List of obstacles, each defined by a tuple (x, y, radius)
         :param step_to_reach_goal: Number of steps to reach the goal for each agent
@@ -32,8 +30,6 @@ class MPCCollisionAvoidance:
         self.nu = nu    # number of inputs for each agent
         self.number_of_agents = number_of_agents
         self.dt = dt
-        self.u_min = u_min
-        self.u_max = u_max
         self.R = 0.1*np.eye(number_of_agents*nu)
         self.Q = 0.5*np.diag([0, 0, 1, 1] * (number_of_agents))
         self.goal_area_size = goal_area_size
@@ -112,8 +108,9 @@ class MPCCollisionAvoidance:
         slack_goal_weight = 10
         slack_obs_weight = 200
         slack_coll_weight = 200
-        self.alpha_obs = 0.4
-        self.alpha_coll = 0.1
+        self.alpha_obs = 0.5
+        self.alpha_coll = 0.2
+        self.alpha_goal = 0.2
         gamma_goal1 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
@@ -171,8 +168,6 @@ class MPCCollisionAvoidance:
         for k in range(self.horizon-1):
             x_next = self.define_dynamics(self.x[:, k], self.u[:, k])
             constraints.append(self.x[:, k + 1] == x_next)
-            constraints.append(self.u[:, k] >= self.u_min)
-            constraints.append(self.u[:, k] <= self.u_max)
 
             # Goal reaching with cbf: b(x, t) = h(x) + gamma(t) >= 0
             for i in range(self.number_of_agents):
@@ -185,12 +180,36 @@ class MPCCollisionAvoidance:
                     h2 = self.goal_area_size - dist_to_goal2
                     h3 = self.goal_area_size - dist_to_goal3
                     h4 = self.goal_area_size - dist_to_goal4
+                    b1 =  h1 + self.gamma_goal1[i][j][k]
+                    b2 =  h2 + self.gamma_goal2[i][j][k]
+                    b3 =  h3 + self.gamma_goal3[i][j][k]
+                    b4 =  h4 + self.gamma_goal4[i][j][k]
+                    dist_to_goal1_next = self.x[i*4,k+1] - self.goal_list[i][j][0]
+                    dist_to_goal2_next = self.x[i*4+1,k+1] - self.goal_list[i][j][1]
+                    dist_to_goal3_next = -self.x[i*4,k+1] + self.goal_list[i][j][0]
+                    dist_to_goal4_next = -self.x[i*4+1,k+1] + self.goal_list[i][j][1]
+                    h1_next = self.goal_area_size - dist_to_goal1_next
+                    h2_next = self.goal_area_size - dist_to_goal2_next
+                    h3_next = self.goal_area_size - dist_to_goal3_next
+                    h4_next = self.goal_area_size - dist_to_goal4_next
+                    b1_next =  h1_next + self.gamma_goal1[i][j][k+1]
+                    b2_next =  h2_next + self.gamma_goal2[i][j][k+1]
+                    b3_next =  h3_next + self.gamma_goal3[i][j][k+1]
+                    b4_next =  h4_next + self.gamma_goal4[i][j][k+1]
                     if len(self.goal_list[i])>1:
+                        constraints.append(b1_next-b1>=self.alpha_obs*b1 - slack_cbf1[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(b2_next-b2>=self.alpha_obs*b2 - slack_cbf2[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(b3_next-b3>=self.alpha_obs*b3 - slack_cbf3[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(b4_next-b4>=self.alpha_obs*b4 - slack_cbf4[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(h1 + self.gamma_goal1[i][j][k] >= -slack_cbf1[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(h2 + self.gamma_goal2[i][j][k] >= -slack_cbf2[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(h3 + self.gamma_goal3[i][j][k] >= -slack_cbf3[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(h4 + self.gamma_goal4[i][j][k] >= -slack_cbf4[i][j][k] - M * (1 - z[i][j]))
                     else:
+                        constraints.append(b1_next-b1>=self.alpha_obs*b1 - slack_cbf1[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(b2_next-b2>=self.alpha_obs*b2 - slack_cbf2[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(b3_next-b3>=self.alpha_obs*b3 - slack_cbf3[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(b4_next-b4>=self.alpha_obs*b4 - slack_cbf4[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(h1 + self.gamma_goal1[i][j][k] >= -slack_cbf1[i][j][k])
                         constraints.append(h2 + self.gamma_goal2[i][j][k] >= -slack_cbf2[i][j][k])
                         constraints.append(h3 + self.gamma_goal3[i][j][k] >= -slack_cbf3[i][j][k])

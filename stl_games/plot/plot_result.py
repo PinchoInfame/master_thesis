@@ -30,19 +30,20 @@ class PlotResult:
         robot_id_list_associated_goals = sum([[i] * number_of_goals[i] for i in range(len(number_of_goals))], [])
         robot_positions = []
         colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        for i in range(number_of_robots):
+            x_0 = x0[i*4]
+            y_0 = x0[(i*4)+1]
+            plt.plot(x_0, y_0, marker='o', color='black')
+        plt.plot(x_0, y_0, label="start", marker='o', color='black')
         if dense_state_array is not None:
             self.plot_dense_trajectory(dense_state_array, number_of_robots)
         else:
             for i in range(number_of_robots):
                 robot_x=(x[i*4])
                 robot_y=(x[(i*4)+1])
-                x_0 = x0[i*4]
-                y_0 = x0[(i*4)+1]
                 robot_label = f"Robot {i+1}"
-                plt.plot(robot_x, robot_y, label=robot_label, linestyle='-', marker='o')
-                plt.plot(x_0, y_0, marker='o', color='black')
+                plt.plot(robot_x, robot_y, label=robot_label, linestyle='-')
                 robot_positions.append((robot_x, robot_y))
-            plt.plot(x_0, y_0, label="start", marker='o', color='black')
         '''
         if len(goal_list)>0:
             for i in range(len(goal_list)):
