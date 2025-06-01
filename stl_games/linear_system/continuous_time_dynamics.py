@@ -1,5 +1,5 @@
 import numpy as np
-def continuous_time_dynamics(t, x, u, number_of_robots):
+def double_integrator(t, x, u, number_of_robots):
     """
     Continuous time dynamics for the system.
     """

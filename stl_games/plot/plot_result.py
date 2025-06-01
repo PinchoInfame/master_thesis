@@ -3,8 +3,6 @@ from matplotlib.patches import Circle, Rectangle
 import numpy as np
 import itertools
 
-from stl_games.collision.collision_handler import CollisionHandler
-
 class PlotResult:
     """
     Class to plot the results of the simulation, including robot trajectories, goals, and obstacles.
@@ -82,13 +80,24 @@ class PlotResult:
                 # Compute radius to enclose the square (half the diagonal)
                 radius = obs[2]
                 # Plot the enclosing circle
-                circle = Circle((cx, cy), radius, color='red', fill=False)
+                circle = Circle((cx, cy), radius, color='grey', fill=True, alpha=0.5)
                 if not obstacle_legend_added:
                     circle.set_label('Obstacle Area')
                     obstacle_legend_added = True
                 plt.gca().add_patch(circle)
-        collision_handler = CollisionHandler()
-        _, _, collision_points_x, collision_points_y = collision_handler.detect_collision(x, number_of_robots, safe_dist)
+        
+        
+        collision_points_x = []
+        collision_points_y = []
+        for robot1_index, robot2_index in itertools.combinations(range(number_of_robots), 2):
+            robot1_x=(x[robot1_index*4])
+            robot1_y=(x[(robot1_index*4)+1])
+            robot2_x=(x[robot2_index*4])
+            robot2_y=(x[(robot2_index*4)+1])
+            collision_check = np.sqrt((robot1_x - robot2_x)**2 + (robot1_y - robot2_y)**2) < safe_dist
+            collision_points_x.append((robot1_x[collision_check] + robot2_x[collision_check])/2)
+            collision_points_y.append((robot1_y[collision_check] + robot2_y[collision_check])/2)
+
         if len(collision_points_x)>0:
             for i in range(len(collision_points_x)-1):
                 plt.scatter(collision_points_x[i], collision_points_y[i], color='red', zorder=5, marker='X')
@@ -96,7 +105,7 @@ class PlotResult:
         plt.title("Robot Trajectories and Collisions")
         plt.xlabel("X Position")
         plt.ylabel("Y Position")
-        plt.legend(loc='upper right')
+        #plt.legend(loc='upper right')
         plt.xlim((-grid_size/10,grid_size+grid_size/10))
         plt.ylim((-grid_size/10,grid_size+grid_size/10))
         plt.grid(True)

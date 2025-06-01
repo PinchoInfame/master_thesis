@@ -77,11 +77,8 @@ class MPCHighLevelPlanner:
         :param x0: Initial state of the system, flattened as a 1D array
         '''
         self.control_cost = 0
-        self.stage_cost = 0
         self.slack_cost_goal = 0
         self.slack_cost_obs = 0
-        self.terminal_cost = 0
-        self.smoothing_cost = 0
         constraints = []
         slack_cbf1 = {i: cp.Variable((len(self.goal_list[i]), self.horizon), nonneg=True) for i in range(self.number_of_agents)}
         slack_cbf2 = {i: cp.Variable((len(self.goal_list[i]), self.horizon), nonneg=True) for i in range(self.number_of_agents)}
@@ -92,10 +89,10 @@ class MPCHighLevelPlanner:
         slack_terminal3 = {i: cp.Variable((len(self.goal_list[i])), nonneg=True) for i in range(self.number_of_agents)}
         slack_terminal4 = {i: cp.Variable((len(self.goal_list[i])), nonneg=True) for i in range(self.number_of_agents)}
 
-        slack_cost_weight = 100
-        rho = 1000
+        slack_cost_weight = 200
+        rho = 300
         self.alpha_obs = 0.8
-        self.alpha_goal = 0.5
+        self.alpha_goal = 1.0
         gamma_goal1 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
@@ -107,7 +104,6 @@ class MPCHighLevelPlanner:
             time_interval = (0,self.step_to_reach_goal[i])
             switch = self.step_to_reach_goal[i]+1
             for j in range(len(self.goal_list[i])):
-                #h0_goal = self.goal_area_size - np.linalg.norm(x0[i*4:i*4+2]-self.goal_list[i][j][0:2])
                 h0_goal1 = self.goal_area_size - (x0[i*4]-self.goal_list[i][j][0])
                 h0_goal2 = self.goal_area_size - (x0[i*4+1]-self.goal_list[i][j][1])
                 h0_goal3 = self.goal_area_size - (-x0[i*4]+self.goal_list[i][j][0])
@@ -126,14 +122,6 @@ class MPCHighLevelPlanner:
             self.gamma_goal4[i].value = gamma_goal4[i]
 
         
-        '''
-        z = {i: cp.Variable((self.horizon, len(self.goal_list[i])), boolean=True) for i in range(self.number_of_agents)}
-        for i in range(self.number_of_agents):
-            if len(self.goal_list[i])>1:
-                for k in range(self.horizon-1):
-                    constraints.append(cp.sum(z[i][k]) >= 1)
-        '''
-        
         z = {i: cp.Variable((len(self.goal_list[i])), boolean=True) for i in range(self.number_of_agents)}
         for i in range(self.number_of_agents):
             if len(self.goal_list[i])>1:
@@ -147,7 +135,6 @@ class MPCHighLevelPlanner:
             for j, obs in enumerate(self.obs_list):
                 cbf_constraint = self.parameter1_obs[i][(j*2):(j*2)+2] @ (self.u[i*2:i*2+2, 0]) + self.parameter2_obs[i][j]
                 constraints.append(cbf_constraint >= -slack_obs[i][j])
-
               
         for k in range(self.horizon-1):
             x_next = self.define_dynamics(self.x[:, k], self.u[:, k])
@@ -182,19 +169,19 @@ class MPCHighLevelPlanner:
                     b4_next =  h4_next + self.gamma_goal4[i][j][k+1]
 
                     if len(self.goal_list[i])>1:
-                        constraints.append(h1 + self.gamma_goal1[i][j][k] >= self.goal_area_size -slack_cbf1[i][j][k] - M * (1 - z[i][j]))
-                        constraints.append(h2 + self.gamma_goal2[i][j][k] >= self.goal_area_size -slack_cbf2[i][j][k] - M * (1 - z[i][j]))
-                        constraints.append(h3 + self.gamma_goal3[i][j][k] >= self.goal_area_size -slack_cbf3[i][j][k] - M * (1 - z[i][j]))
-                        constraints.append(h4 + self.gamma_goal4[i][j][k] >= self.goal_area_size -slack_cbf4[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(h1 + self.gamma_goal1[i][j][k] >= -slack_cbf1[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(h2 + self.gamma_goal2[i][j][k] >= -slack_cbf2[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(h3 + self.gamma_goal3[i][j][k] >= -slack_cbf3[i][j][k] - M * (1 - z[i][j]))
+                        constraints.append(h4 + self.gamma_goal4[i][j][k] >= -slack_cbf4[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(b1_next-b1 >= self.alpha_obs*b1 - slack_cbf1[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(b2_next-b2 >= self.alpha_obs*b2 - slack_cbf2[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(b3_next-b3 >= self.alpha_obs*b3 - slack_cbf3[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(b4_next-b4 >= self.alpha_obs*b4 - slack_cbf4[i][j][k] - M * (1 - z[i][j]))
                     else:
-                        constraints.append(h1 + self.gamma_goal1[i][j][k] >= self.goal_area_size -slack_cbf1[i][j][k])
-                        constraints.append(h2 + self.gamma_goal2[i][j][k] >= self.goal_area_size -slack_cbf2[i][j][k])
-                        constraints.append(h3 + self.gamma_goal3[i][j][k] >= self.goal_area_size -slack_cbf3[i][j][k])
-                        constraints.append(h4 + self.gamma_goal4[i][j][k] >= self.goal_area_size -slack_cbf4[i][j][k])
+                        constraints.append(h1 + self.gamma_goal1[i][j][k] >= -slack_cbf1[i][j][k])
+                        constraints.append(h2 + self.gamma_goal2[i][j][k] >= -slack_cbf2[i][j][k])
+                        constraints.append(h3 + self.gamma_goal3[i][j][k] >= -slack_cbf3[i][j][k])
+                        constraints.append(h4 + self.gamma_goal4[i][j][k] >= -slack_cbf4[i][j][k])
                         constraints.append(b1_next-b1 >= self.alpha_obs*b1 - slack_cbf1[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(b2_next-b2 >= self.alpha_obs*b2 - slack_cbf2[i][j][k] - M * (1 - z[i][j]))
                         constraints.append(b3_next-b3 >= self.alpha_obs*b3 - slack_cbf3[i][j][k] - M * (1 - z[i][j]))
@@ -212,22 +199,21 @@ class MPCHighLevelPlanner:
                 h3_terminal = self.goal_area_size - final_dist_to_goal3
                 h4_terminal = self.goal_area_size - final_dist_to_goal4
                 if len(self.goal_list[i])>1:
-                    constraints.append(h1_terminal + self.gamma_goal1[i][j][self.horizon] >= self.goal_area_size -slack_terminal1[i][j] - M * (1 - z[i][j]))
-                    constraints.append(h2_terminal + self.gamma_goal2[i][j][self.horizon] >= self.goal_area_size -slack_terminal2[i][j] - M * (1 - z[i][j]))
-                    constraints.append(h3_terminal + self.gamma_goal3[i][j][self.horizon] >= self.goal_area_size -slack_terminal3[i][j] - M * (1 - z[i][j]))
-                    constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= self.goal_area_size -slack_terminal4[i][j] - M * (1 - z[i][j]))
+                    constraints.append(h1_terminal + self.gamma_goal1[i][j][self.horizon] >= -slack_terminal1[i][j] - M * (1 - z[i][j]))
+                    constraints.append(h2_terminal + self.gamma_goal2[i][j][self.horizon] >= -slack_terminal2[i][j] - M * (1 - z[i][j]))
+                    constraints.append(h3_terminal + self.gamma_goal3[i][j][self.horizon] >= -slack_terminal3[i][j] - M * (1 - z[i][j]))
+                    constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= -slack_terminal4[i][j] - M * (1 - z[i][j]))
                 else:
-                    constraints.append(h1_terminal + self.gamma_goal1[i][j][self.horizon] >= self.goal_area_size -slack_terminal1[i][j])
-                    constraints.append(h2_terminal + self.gamma_goal2[i][j][self.horizon] >= self.goal_area_size -slack_terminal2[i][j])
-                    constraints.append(h3_terminal + self.gamma_goal3[i][j][self.horizon] >= self.goal_area_size -slack_terminal3[i][j])
-                    constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= self.goal_area_size -slack_terminal4[i][j]) 
+                    constraints.append(h1_terminal + self.gamma_goal1[i][j][self.horizon] >= -slack_terminal1[i][j])
+                    constraints.append(h2_terminal + self.gamma_goal2[i][j][self.horizon] >= -slack_terminal2[i][j])
+                    constraints.append(h3_terminal + self.gamma_goal3[i][j][self.horizon] >= -slack_terminal3[i][j])
+                    constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= -slack_terminal4[i][j]) 
             self.control_cost += cp.quad_form(self.u[:, k], self.R)
             self.control_cost += cp.quad_form(self.x[:, k], self.Q)
         for i in range(self.number_of_agents):
             self.slack_cost_goal += slack_cost_weight*(cp.sum(cp.sum(slack_cbf1[i])) + cp.sum(cp.sum(slack_cbf2[i])) + cp.sum(cp.sum(slack_cbf3[i])) + cp.sum(cp.sum(slack_cbf4[i]))
                                                        + cp.sum(slack_terminal1[i]) + cp.sum(slack_terminal2[i]) + cp.sum(slack_terminal3[i]) + cp.sum(slack_terminal4[i]))
             self.slack_cost_obs += rho*cp.sum(slack_obs[i])
-        #total_cost = self.slack_cost_goal + self.stage_cost + self.slack_cost_obs + self.terminal_cost
         total_cost = self.slack_cost_goal + self.slack_cost_obs + self.control_cost
         self.problem = cp.Problem(cp.Minimize(total_cost), constraints)
 
@@ -239,8 +225,8 @@ class MPCHighLevelPlanner:
         :param current_iteration: Current iteration number (used for time-varying sets)
         '''
         self.x0.value = x0
-        if (x_prev is None):
-            x_prev = self.compute_initial_trajectory(x0)
+        
+        # update gamma(t) --> time shaping function
         gamma_goal1 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
@@ -254,6 +240,8 @@ class MPCHighLevelPlanner:
                 h0_goal2 = self.goal_area_size - (x0[i*4+1]-self.goal_list[i][j][1])
                 h0_goal3 = self.goal_area_size - (-x0[i*4]+self.goal_list[i][j][0])
                 h0_goal4 = self.goal_area_size - (-x0[i*4+1]+self.goal_list[i][j][1])
+                if (h0_goal1 >= self.goal_area_size)&(h0_goal2 >= self.goal_area_size)&(h0_goal3 >= self.goal_area_size)&(h0_goal4 >= self.goal_area_size):
+                    switch = 0
                 gamma0_goal1, tau_goal1 = self.define_gamma_params(time_interval, 'eventually', h0_goal1)
                 gamma0_goal2, tau_goal2 = self.define_gamma_params(time_interval, 'eventually', h0_goal2)
                 gamma0_goal3, tau_goal3 = self.define_gamma_params(time_interval, 'eventually', h0_goal3)
@@ -266,7 +254,8 @@ class MPCHighLevelPlanner:
             self.gamma_goal2[i].value = gamma_goal2[i]
             self.gamma_goal3[i].value = gamma_goal3[i]
             self.gamma_goal4[i].value = gamma_goal4[i]
-        # warm-startin strategy
+
+        # Compute parameters to enforce obstacle avoidance
         parameter1_obs = {i: np.zeros((2*self.number_of_obs)) for i in range(self.number_of_agents)}
         parameter2_obs = {i: np.zeros((self.number_of_obs)) for i in range(self.number_of_agents)}
         for i in range(self.number_of_agents):
@@ -274,7 +263,6 @@ class MPCHighLevelPlanner:
                 obs_center = np.array([obs[0], obs[1]])
                 obs_radius = obs[2]
                 x0_i = x0[i*4:i*4+4]
-                #u0_i = self.u[i*2:i*2+2, 0]
                 Ap = np.array([[1, 0, self.dt, 0],
                             [0, 1, 0, self.dt]])
                 Bp = np.array([[(self.dt**2)/2, 0],
@@ -302,15 +290,10 @@ class MPCHighLevelPlanner:
             self.solver_time += self.problem.solver_stats.solve_time
             if self.problem.status in ["optimal", "optimal_inaccurate"]:
                 u_opt = self.u.value[:,0]
-                #print("control cost: ", self.control_cost.value)
-                #print("stage cost: ", self.stage_cost.value)
-                #print("slack cost: ", self.slack_cost_goal.value)
                 #self.plot_cbf_set(self.x.value[:,-1], xG, self.gamma_goal1[0][0].value, self.goal_area_size, self.horizon)
                 return u_opt, self.x.value, self.u.value
             else:
                 print("Problem is not optimal. Status:", self.problem.status)
-                #if self.problem.status == "infeasible":
-                #    print("Infeasible constraints:", self.problem.constraints[self.problem.infeasible_constraints])
                 return None, None, None
         except cp.SolverError as e:
             print('Solver failed:', e)
@@ -334,10 +317,10 @@ class MPCHighLevelPlanner:
         
     def compute_gamma(self, T, gamma0, tau, switch):
         time_values = np.arange(0, T)
-        gamma_values = gamma0 - (gamma0 / tau) * time_values
-        gamma_values = np.maximum(gamma_values, 0)
+        gamma_values = gamma0 - ((gamma0 + self.goal_area_size) / tau) * time_values
+        gamma_values = np.maximum(gamma_values, -self.goal_area_size)
         if T < self.horizon+1:
-            gamma_values = np.concatenate((gamma_values, np.zeros(self.horizon+1-T)))
+            gamma_values = np.concatenate((gamma_values, self.goal_area_size*np.ones(self.horizon+1-T)))
         if switch is not None:
             gamma_values[switch:]=1e3
         return gamma_values[:self.horizon+1]
@@ -391,35 +374,3 @@ class MPCHighLevelPlanner:
         plt.legend()
         plt.grid(True)
         plt.show()
-
-    def compute_initial_trajectory(self, x0):
-        closest_goals_indices = self.find_closest_goals(x0)
-        #ToDo: ora che hai calcolato il goal piu vicino ad ogni robot calcola il controllo necessario per avvicinarsi
-        u = np.zeros((self.nu*self.number_of_agents, self.horizon))
-        x = np.zeros((self.nx*self.number_of_agents, self.horizon+1))
-        x[:,0] = x0
-        for i in range(self.number_of_agents):
-            goal = self.goal_list[i][closest_goals_indices[i]][0:2]
-            #print("closest goal: ", goal)
-            pos = x0[i*4:i*4+2]
-            #vel = x0[i*4+2:i*4+4]
-            t_values = np.linspace(0, 1, self.step_to_reach_goal[i] + 1)
-            trajectory = np.outer(1 - t_values, pos) + np.outer(t_values, goal)
-            trajectory = trajectory.T
-            x[i*4:i*4+2, :] = trajectory[:, :self.horizon+1]
-        return x
-    
-    def find_closest_goals(self, x0):
-        closest_goals_indices = []
-        for i in range(self.number_of_agents):
-            min_dist = 1e6
-            initial_pos = x0[i*4:i*4+2]
-            for j in range(len(self.goal_list[i])):
-                dist = np.linalg.norm(initial_pos-self.goal_list[i][j][0:2])
-                if dist < min_dist:
-                    min_dist = dist
-                    closest_goal = j
-            closest_goals_indices.append(closest_goal)
-        return closest_goals_indices
-            
-        

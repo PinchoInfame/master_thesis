@@ -1,0 +1,168 @@
+--- N=2, T=5 --- 
+
+Centralized Solver Statistics:
+  Rg: mean = 3.74, std = 0.43
+  Robs: mean = 4.72, std = 1.25
+  Rcoll: mean = 44.95, std = 22.94
+  Time: mean = 0.48, std = 0.21
+
+Decentralized Solver Statistics:
+  Rg: mean = 2.79, std = 0.95
+  Robs: mean = 4.99, std = 2.07
+  Rcoll: mean = 42.74, std = 25.25
+  Time: mean = 0.95, std = 0.03
+
+--- N=2, T=10 --- 
+
+Centralized Solver Statistics:
+  Rg: mean = 3.91, std = 0.19
+  Robs: mean = 6.12, std = 2.19
+  Rcoll: mean = 28.80, std = 17.20
+  Time: mean = 28.61, std = 32.22
+
+Decentralized Solver Statistics:
+  Rg: mean = 3.49, std = 0.58
+  Robs: mean = 5.06, std = 3.74
+  Rcoll: mean = 40.02, std = 14.12
+  Time: mean = 3.81, std = 0.91
+
+--- N=2, T=15 --- 
+
+Centralized Solver Statistics:
+  Rg: mean = 3.74, std = 0.74
+  Robs: mean = 6.85, std = 3.34
+  Rcoll: mean = 32.80, std = 23.67
+  Time: mean = 21.57, std = 10.84
+
+Decentralized Solver Statistics:
+  Rg: mean = 3.77, std = 0.54
+  Robs: mean = 5.27, std = 5.92
+  Rcoll: mean = 29.80, std = 16.98
+  Time: mean = 3.11, std = 1.08
+
+--- N=2, T=20 ---
+
+Centralized Solver Statistics:
+  Rg: mean = nan, std = nan
+  Robs: mean = nan, std = nan
+  Rcoll: mean = nan, std = nan
+  Time: mean = nan, std = nan
+
+Decentralized Solver Statistics:
+  Rg: mean = 3.78, std = 0.40
+  Robs: mean = 2.54, std = 2.64
+  Rcoll: mean = 24.01, std = 12.71
+  Time: mean = 4.49, std = 0.42
+
+-----------------------------------------------------------------------------------
+
+--- N=4, T=5 --- 
+
+Centralized Solver Statistics:
+  Rg: mean = 3.22, std = 0.72
+  Robs: mean = 3.91, std = 1.42
+  Rcoll: mean = 8.96, std = 1.95
+  Time: mean = 12.22, std = 9.53
+
+Decentralized Solver Statistics:
+  Rg: mean = 2.46, std = 0.65
+  Robs: mean = 4.05, std = 1.51
+  Rcoll: mean = 8.22, std = 3.74
+  Time: mean = 1.96, std = 0.64
+
+--- N=4, T=10 --- 
+
+Centralized Solver Statistics:
+  All of them took >10 mins
+
+Decentralized Solver Statistics:
+  Rg: mean = 2.55, std = 1.51
+  Robs: mean = 4.07, std = 3.57
+  Rcoll: mean = 9.85, std = 2.87
+  Time: mean = 4.98, std = 0.89
+
+--- N=4, T=15 ---
+
+Centralized Solver Statistics: 
+  Rg: mean = nan, std = nan
+  Robs: mean = nan, std = nan
+  Rcoll: mean = nan, std = nan
+  Time: mean = nan, std = nan
+
+Decentralized Solver Statistics:
+  Rg: mean = 3.35, std = 0.65
+  Robs: mean = 2.11, std = 1.79
+  Rcoll: mean = 15.97, std = 8.81
+  Time: mean = 4.75, std = 0.59
+
+--- N=4, T=20 ---
+
+Centralized Solver Statistics:
+  Rg: mean = nan, std = nan
+  Robs: mean = nan, std = nan
+  Rcoll: mean = nan, std = nan
+  Time: mean = nan, std = nan
+
+Decentralized Solver Statistics:
+  Rg: mean = 3.14, std = 0.62
+  Robs: mean = 5.23, std = 4.88
+  Rcoll: mean = 15.62, std = 6.26
+  Time: mean = 7.78, std = 0.58
+
+------------------------------------------------------------------------------------
+
+--- N=6, T=5 --- 
+
+Centralized Solver Statistics:
+  Rg: mean = 3.40, std = 0.43
+  Robs: mean = 4.42, std = 0.88
+  Rcoll: mean = 6.99, std = 0.41
+  Time: mean = 26.94, std = 11.11
+
+Decentralized Solver Statistics:
+  Rg: mean = 1.59, std = 0.69
+  Robs: mean = 4.37, std = 2.11
+  Rcoll: mean = 7.10, std = 2.41
+  Time: mean = 6.79, std = 5.74
+
+--- N=6, T=10 --- 
+
+Centralized Solver Statistics:
+  All of them took >10 mins
+
+Decentralized Solver Statistics:
+  Rg: mean = 2.41, std = 2.53
+  Robs: mean = 4.24, std = 4.37
+  Rcoll: mean = 6.35, std = 1.73
+  Time: mean = 7.40, std = 1.36
+
+
+--- N=6, T=15 --- 
+
+Centralized Solver Statistics:
+  Rg: mean = nan, std = nan
+  Robs: mean = nan, std = nan
+  Rcoll: mean = nan, std = nan
+  Time: mean = nan, std = nan
+
+Decentralized Solver Statistics:
+  Rg: mean = 3.21, std = 0.77
+  Robs: mean = 3.24, std = 3.76
+  Rcoll: mean = 7.87, std = 4.54
+  Time: mean = 7.92, std = 1.42
+
+
+--- N=6, T=20 ---
+
+Centralized Solver Statistics:
+  Rg: mean = nan, std = nan
+  Robs: mean = nan, std = nan
+  Rcoll: mean = nan, std = nan
+  Time: mean = nan, std = nan
+
+Decentralized Solver Statistics:
+  Rg: mean = 2.50, std = 0.74
+  Robs: mean = 0.75, std = 1.38
+  Rcoll: mean = 7.08, std = 2.04
+  Time: mean = 12.25, std = 1.51
+

@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 
-class MPCCollisionAvoidance:
+class MPCCentralized:
     '''
     A controller class for computing optimal trajectories using Model Predictive Control (MPC)
     integrated with Control Barrier Functions (CBFs) and time-varying sets.
@@ -44,7 +44,6 @@ class MPCCollisionAvoidance:
         self.x = cp.Variable((self.nx*self.number_of_agents, self.horizon + 1))
         self.u = cp.Variable((self.nu*self.number_of_agents, self.horizon))
         self.x0 = cp.Parameter(self.nx*self.number_of_agents)
-        self.xG = cp.Parameter(self.nx*self.number_of_agents)
         self.gamma_goal1 = {i: cp.Parameter((len(self.goal_list[i]), self.horizon + 1)) for i in range(self.number_of_agents)}
         self.gamma_goal2 = {i: cp.Parameter((len(self.goal_list[i]), self.horizon + 1)) for i in range(self.number_of_agents)}
         self.gamma_goal3 = {i: cp.Parameter((len(self.goal_list[i]), self.horizon + 1)) for i in range(self.number_of_agents)}
@@ -53,8 +52,8 @@ class MPCCollisionAvoidance:
         self.parameter1_obs = {i: cp.Parameter((2*self.number_of_obs)) for i in range(self.number_of_agents)}
         self.parameter2_obs = {i: cp.Parameter((self.number_of_obs)) for i in range(self.number_of_agents)}
         self.number_of_combinations = len(list(itertools.combinations(range(self.number_of_agents), 2)))
-        self.parameter1_coll = {i: cp.Parameter((self.horizon+1, 2)) for i in range(self.number_of_combinations)}
-        self.parameter2_coll = {i: cp.Parameter((self.horizon+1)) for i in range(self.number_of_combinations)}
+        self.parameter1_coll = {i: cp.Parameter((2)) for i in range(self.number_of_combinations)}
+        self.parameter2_coll = {i: cp.Parameter() for i in range(self.number_of_combinations)}
         
     def define_dynamics(self, state: np.ndarray, input: np.ndarray) -> np.ndarray:
         '''
@@ -83,18 +82,10 @@ class MPCCollisionAvoidance:
         '''
         :param x0: Initial state of the system, flattened as a 1D array
         '''
-        xG = np.zeros((4 * self.number_of_agents))  # Stores the closest goal for each agent
-        closest_goals_indices = self.find_closest_goals(x0)
-        for i in range(self.number_of_agents):
-            xG[i*4:i*4+2] = self.goal_list[i][closest_goals_indices[i]][0:2]
-        self.xG.value = xG
         self.control_cost = 0
-        self.stage_cost = 0
         self.slack_cost_goal = 0
         self.slack_cost_obs = 0
         self.slack_cost_coll = 0
-        self.terminal_cost = 0
-        self.smoothing_cost = 0
         constraints = []
         slack_cbf1 = {i: cp.Variable((len(self.goal_list[i]), self.horizon), nonneg=True) for i in range(self.number_of_agents)}
         slack_cbf2 = {i: cp.Variable((len(self.goal_list[i]), self.horizon), nonneg=True) for i in range(self.number_of_agents)}
@@ -105,12 +96,12 @@ class MPCCollisionAvoidance:
         slack_terminal3 = {i: cp.Variable((len(self.goal_list[i])), nonneg=True) for i in range(self.number_of_agents)}
         slack_terminal4 = {i: cp.Variable((len(self.goal_list[i])), nonneg=True) for i in range(self.number_of_agents)}
 
-        slack_goal_weight = 10
-        slack_obs_weight = 200
+        slack_goal_weight = 100
+        slack_obs_weight = 100
         slack_coll_weight = 200
-        self.alpha_obs = 0.5
-        self.alpha_coll = 0.2
-        self.alpha_goal = 0.2
+        self.alpha_obs = 0.6
+        self.alpha_coll = 0.5
+        self.alpha_goal = 1.0
         gamma_goal1 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
@@ -122,7 +113,6 @@ class MPCCollisionAvoidance:
             time_interval = (0,self.step_to_reach_goal[i])
             switch = self.step_to_reach_goal[i]+1
             for j in range(len(self.goal_list[i])):
-                #h0_goal = self.goal_area_size - np.linalg.norm(x0[i*4:i*4+2]-self.goal_list[i][j][0:2])
                 h0_goal1 = self.goal_area_size - (x0[i*4]-self.goal_list[i][j][0])
                 h0_goal2 = self.goal_area_size - (x0[i*4+1]-self.goal_list[i][j][1])
                 h0_goal3 = self.goal_area_size - (-x0[i*4]+self.goal_list[i][j][0])
@@ -141,14 +131,6 @@ class MPCCollisionAvoidance:
             self.gamma_goal4[i].value = gamma_goal4[i]
 
         
-        '''
-        z = {i: cp.Variable((self.horizon, len(self.goal_list[i])), boolean=True) for i in range(self.number_of_agents)}
-        for i in range(self.number_of_agents):
-            if len(self.goal_list[i])>1:
-                for k in range(self.horizon-1):
-                    constraints.append(cp.sum(z[i][k]) >= 1)
-        '''
-        
         z = {i: cp.Variable((len(self.goal_list[i])), boolean=True) for i in range(self.number_of_agents)}
         for i in range(self.number_of_agents):
             if len(self.goal_list[i])>1:
@@ -160,10 +142,14 @@ class MPCCollisionAvoidance:
         # Obstacle avoidance just at the first step of each iteration
         for i in range(self.number_of_agents):
             for j, obs in enumerate(self.obs_list):
-                cbf_constraint = self.parameter1_obs[i][(j*2):(j*2)+2] @ (self.u[i*2:i*2+2, 0]) + self.parameter2_obs[i][j]
-                constraints.append(cbf_constraint >= -slack_obs[i][j])
+                cbf_constraint_obs = self.parameter1_obs[i][(j*2):(j*2)+2] @ (self.u[i*2:i*2+2, 0]) + self.parameter2_obs[i][j]
+                constraints.append(cbf_constraint_obs >= -slack_obs[i][j])
 
         slack_coll = cp.Variable((self.number_of_combinations), nonneg=True)
+        # Collision avoidance just at the first step of each iteration
+        for idx, (i, j) in enumerate(itertools.combinations(range(self.number_of_agents), 2)):
+            cbf_constraint_coll = self.parameter1_coll[idx] @ (self.u[i*2:i*2+2, 0] - self.u[j*2:j*2+2, 0]) + self.parameter2_coll[idx]
+            constraints.append(cbf_constraint_coll >= -slack_coll[idx])
 
         for k in range(self.horizon-1):
             x_next = self.define_dynamics(self.x[:, k], self.u[:, k])
@@ -215,14 +201,6 @@ class MPCCollisionAvoidance:
                         constraints.append(h3 + self.gamma_goal3[i][j][k] >= -slack_cbf3[i][j][k])
                         constraints.append(h4 + self.gamma_goal4[i][j][k] >= -slack_cbf4[i][j][k])
 
-            # Collision avoidance with cbf
-            for idx, (i, j) in enumerate(itertools.combinations(range(self.number_of_agents), 2)):
-                # Compute the distance between the two agents
-                diff_pos = self.x[i*4:i*4+2, k] - self.x[j*4:j*4+2, k]
-                d_hat = (self.parameter1_coll[idx][k,:]) @ (diff_pos) + self.parameter2_coll[idx][k]
-                h_collision = d_hat - self.safe_dist + self.alpha_coll * (d_hat - self.safe_dist)
-                constraints.append(h_collision >= -slack_coll[idx])
-
         # Define terminal CBF constraints with slack
         for i in range(self.number_of_agents):
             for j in range(len(self.goal_list[i])):
@@ -243,26 +221,19 @@ class MPCCollisionAvoidance:
                     constraints.append(h1_terminal + self.gamma_goal1[i][j][self.horizon] >= -slack_terminal1[i][j])
                     constraints.append(h2_terminal + self.gamma_goal2[i][j][self.horizon] >= -slack_terminal2[i][j])
                     constraints.append(h3_terminal + self.gamma_goal3[i][j][self.horizon] >= -slack_terminal3[i][j])
-                    constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= -slack_terminal4[i][j]) 
+                    constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= -slack_terminal4[i][j])
+
+
             self.control_cost += cp.quad_form(self.u[:, k], self.R)
             self.control_cost += cp.quad_form(self.x[:, k], self.Q)
-            for i in range(self.number_of_agents):
-                distance_from_goal = cp.norm(self.x[i*4:i*4+2, k] - self.xG[i*4:i*4+2], 2)
-                self.stage_cost += 0.5*distance_from_goal**2
 
         for i in range(self.number_of_agents):
             self.slack_cost_goal += slack_goal_weight*(cp.sum(cp.sum(slack_cbf1[i])) + cp.sum(cp.sum(slack_cbf2[i])) + cp.sum(cp.sum(slack_cbf3[i])) + cp.sum(cp.sum(slack_cbf4[i]))
                                                        + cp.sum(slack_terminal1[i]) + cp.sum(slack_terminal2[i]) + cp.sum(slack_terminal3[i]) + cp.sum(slack_terminal4[i]))
             self.slack_cost_obs += slack_obs_weight*cp.sum(slack_obs[i])
-        for i in range(self.number_of_agents):
-            terminal_state = self.x[i*4:i*4+2, -1]     # position at final time step
-            goal_state = self.xG[i*4:i*4+2]            # desired goal position
-            terminal_dist = cp.norm(terminal_state - goal_state, 2)
-            self.terminal_cost += 1.0 * terminal_dist**2
         for i in range(self.number_of_combinations):
             self.slack_cost_coll += slack_coll_weight*slack_coll[i]
-        #total_cost = self.slack_cost_goal + self.stage_cost + self.slack_cost_obs + self.terminal_cost
-        total_cost = self.slack_cost_goal + self.slack_cost_obs + self.slack_cost_coll + self.control_cost + self.stage_cost
+        total_cost = self.slack_cost_goal + self.slack_cost_obs + self.slack_cost_coll + self.control_cost
         self.problem = cp.Problem(cp.Minimize(total_cost), constraints)
 
     def solve_mpc(self, x0: np.ndarray, x_prev: np.ndarray=None, u_prev: np.ndarray=None, current_iteration:int=0):
@@ -273,13 +244,8 @@ class MPCCollisionAvoidance:
         :param current_iteration: Current iteration number (used for time-varying sets)
         '''
         self.x0.value = x0
-        xG = np.zeros((4 * self.number_of_agents))  # Stores the closest goal for each agent
-        closest_goals_indices = self.find_closest_goals(x0)
-        for i in range(self.number_of_agents):
-            xG[i*4:i*4+2] = self.goal_list[i][closest_goals_indices[i]][0:2]
-        #self.xG.value = xG
-        if (x_prev is None):
-            x_prev = self.compute_initial_trajectory(x0)
+
+        # update gamma(t) --> time shaping function
         gamma_goal1 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
@@ -293,6 +259,8 @@ class MPCCollisionAvoidance:
                 h0_goal2 = self.goal_area_size - (x0[i*4+1]-self.goal_list[i][j][1])
                 h0_goal3 = self.goal_area_size - (-x0[i*4]+self.goal_list[i][j][0])
                 h0_goal4 = self.goal_area_size - (-x0[i*4+1]+self.goal_list[i][j][1])
+                if (h0_goal1 >= self.goal_area_size)&(h0_goal2 >= self.goal_area_size)&(h0_goal3 >= self.goal_area_size)&(h0_goal4 >= self.goal_area_size):
+                    switch = 0
                 gamma0_goal1, tau_goal1 = self.define_gamma_params(time_interval, 'eventually', h0_goal1)
                 gamma0_goal2, tau_goal2 = self.define_gamma_params(time_interval, 'eventually', h0_goal2)
                 gamma0_goal3, tau_goal3 = self.define_gamma_params(time_interval, 'eventually', h0_goal3)
@@ -305,42 +273,43 @@ class MPCCollisionAvoidance:
             self.gamma_goal2[i].value = gamma_goal2[i]
             self.gamma_goal3[i].value = gamma_goal3[i]
             self.gamma_goal4[i].value = gamma_goal4[i]
-        
+
+        # Compute parameters to enforce obstacle avoidance
         parameter1_obs = {i: np.zeros((2*self.number_of_obs)) for i in range(self.number_of_agents)}
         parameter2_obs = {i: np.zeros((self.number_of_obs)) for i in range(self.number_of_agents)}
+        epsilon = 1e-4
+        Ap = np.array([ [1, 0, self.dt, 0],
+                        [0, 1, 0, self.dt]])
+        Bp = np.array([ [(self.dt**2)/2, 0],
+                        [0, (self.dt**2)/2]])
         for i in range(self.number_of_agents):
             for j, obs in enumerate(self.obs_list):
                 obs_center = np.array([obs[0], obs[1]])
                 obs_radius = obs[2]
                 x0_i = x0[i*4:i*4+4]
-                #u0_i = self.u[i*2:i*2+2, 0]
-                Ap = np.array([[1, 0, self.dt, 0],
-                            [0, 1, 0, self.dt]])
-                Bp = np.array([[(self.dt**2)/2, 0],
-                            [0, (self.dt**2)/2]])
-                epsilon = 1e-4
                 dist = x0_i[0:2] - obs_center
                 norm_dist = np.linalg.norm(dist)+epsilon
                 db_dx = dist / norm_dist
                 b = norm_dist - obs_radius # b(x0, t=0)
                 parameter1_obs[i][j*2:j*2+2] = db_dx @ (Bp/self.dt)
                 parameter2_obs[i][j] = db_dx @ ((Ap @ x0_i - x0_i[0:2])/self.dt) + self.alpha_obs * b
-        
+
         for i in range(self.number_of_agents):
             self.parameter1_obs[i].value = parameter1_obs[i]
             self.parameter2_obs[i].value = parameter2_obs[i]
 
-
-        diff_pos_nom = np.zeros((2, self.horizon+1))
-        norm_diff_pos_nom = np.zeros(self.horizon+1)
-        parameter1_coll = {i: np.zeros((self.horizon+1, 2)) for i in range(self.number_of_combinations)}
-        parameter2_coll = {i: np.zeros(self.horizon+1) for i in range(self.number_of_combinations)}
-        for idx, (i, j) in enumerate(itertools.combinations(range(self.number_of_agents), 2)) :
-            for k in range(self.horizon-1):
-                diff_pos_nom[:,k] = x_prev[i*4:i*4+2, k] - x_prev[j*4:j*4+2, k]
-                norm_diff_pos_nom[k] = np.linalg.norm(diff_pos_nom[:,k]) + 1e-6
-                parameter1_coll[idx][k,:] = diff_pos_nom.T[k,:] / norm_diff_pos_nom[k]
-                parameter2_coll[idx][k] = - parameter1_coll[idx][k,:] @ diff_pos_nom[:,k] + norm_diff_pos_nom[k]
+        # Compute parameters to enforce inter-agent collision avoidance
+        parameter1_coll = {i: np.zeros(2) for i in range(self.number_of_combinations)}  # 2D vector
+        parameter2_coll = {i: 0.0 for i in range(self.number_of_combinations)}    
+        for idx, (i, j) in enumerate(itertools.combinations(range(self.number_of_agents), 2)):
+            x0_i = x0[i*4:i*4+4]
+            x0_j = x0[j*4:j*4+4]
+            dist = x0_i[0:2] - x0_j[0:2]
+            norm_dist = np.linalg.norm(dist) + epsilon
+            db_dx = dist / norm_dist
+            b = norm_dist - self.safe_dist
+            parameter1_coll[idx] = db_dx @ (Bp / self.dt)
+            parameter2_coll[idx] = db_dx @ ((Ap @ x0_i - x0_i[0:2]) / self.dt - (Ap @ x0_j - x0_j[0:2]) / self.dt) + self.alpha_coll * b
             
         for i in range(self.number_of_combinations):
             self.parameter1_coll[i].value = parameter1_coll[i]
@@ -357,15 +326,9 @@ class MPCCollisionAvoidance:
             self.solver_time += self.problem.solver_stats.solve_time
             if self.problem.status in ["optimal", "optimal_inaccurate"]:
                 u_opt = self.u.value[:,0]
-                #print("control cost: ", self.control_cost.value)
-                #print("stage cost: ", self.stage_cost.value)
-                #print("slack cost: ", self.slack_cost_goal.value)
-                #self.plot_cbf_set(self.x.value[:,-1], xG, self.gamma_goal1[0][0].value, self.goal_area_size, self.horizon)
                 return u_opt, self.x.value, self.u.value
             else:
                 print("Problem is not optimal. Status:", self.problem.status)
-                #if self.problem.status == "infeasible":
-                #    print("Infeasible constraints:", self.problem.constraints[self.problem.infeasible_constraints])
                 return None, None, None
         except cp.SolverError as e:
             print('Solver failed:', e)
@@ -389,10 +352,10 @@ class MPCCollisionAvoidance:
         
     def compute_gamma(self, T, gamma0, tau, switch):
         time_values = np.arange(0, T)
-        gamma_values = gamma0 - (gamma0 / tau) * time_values
-        gamma_values = np.maximum(gamma_values, 0)
+        gamma_values = gamma0 - ((gamma0 + self.goal_area_size) / tau) * time_values
+        gamma_values = np.maximum(gamma_values, -self.goal_area_size)
         if T < self.horizon+1:
-            gamma_values = np.concatenate((gamma_values, np.zeros(self.horizon+1-T)))
+            gamma_values = np.concatenate((gamma_values, self.goal_area_size*np.ones(self.horizon+1-T)))
         if switch is not None:
             gamma_values[switch:]=1e3
         return gamma_values[:self.horizon+1]
@@ -446,35 +409,4 @@ class MPCCollisionAvoidance:
         plt.legend()
         plt.grid(True)
         plt.show()
-
-    def compute_initial_trajectory(self, x0):
-        closest_goals_indices = self.find_closest_goals(x0)
-        #ToDo: ora che hai calcolato il goal piu vicino ad ogni robot calcola il controllo necessario per avvicinarsi
-        u = np.zeros((self.nu*self.number_of_agents, self.horizon))
-        x = np.zeros((self.nx*self.number_of_agents, self.horizon+1))
-        x[:,0] = x0
-        for i in range(self.number_of_agents):
-            goal = self.goal_list[i][closest_goals_indices[i]][0:2]
-            #print("closest goal: ", goal)
-            pos = x0[i*4:i*4+2]
-            #vel = x0[i*4+2:i*4+4]
-            t_values = np.linspace(0, 1, self.step_to_reach_goal[i] + 1)
-            trajectory = np.outer(1 - t_values, pos) + np.outer(t_values, goal)
-            trajectory = trajectory.T
-            x[i*4:i*4+2, :] = trajectory[:, :self.horizon+1]
-        return x
-    
-    def find_closest_goals(self, x0):
-        closest_goals_indices = []
-        for i in range(self.number_of_agents):
-            min_dist = 1e6
-            initial_pos = x0[i*4:i*4+2]
-            for j in range(len(self.goal_list[i])):
-                dist = np.linalg.norm(initial_pos-self.goal_list[i][j][0:2])
-                if dist < min_dist:
-                    min_dist = dist
-                    closest_goal = j
-            closest_goals_indices.append(closest_goal)
-        return closest_goals_indices
-            
         
