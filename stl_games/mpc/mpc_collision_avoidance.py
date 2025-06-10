@@ -97,11 +97,11 @@ class MPCCentralized:
         slack_terminal4 = {i: cp.Variable((len(self.goal_list[i])), nonneg=True) for i in range(self.number_of_agents)}
 
         slack_goal_weight = 100
-        slack_obs_weight = 100
+        slack_obs_weight = 200
         slack_coll_weight = 200
-        self.alpha_obs = 0.6
-        self.alpha_coll = 0.5
-        self.alpha_goal = 1.0
+        self.alpha_obs = 0.5
+        self.alpha_coll = 0.6
+        self.alpha_goal = 0.8
         gamma_goal1 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal2 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
         gamma_goal3 = {i: np.zeros((len(self.goal_list[i]), self.horizon+1)) for i in range(self.number_of_agents)}
@@ -154,6 +154,8 @@ class MPCCentralized:
         for k in range(self.horizon-1):
             x_next = self.define_dynamics(self.x[:, k], self.u[:, k])
             constraints.append(self.x[:, k + 1] == x_next)
+            self.control_cost += cp.quad_form(self.u[:, k], self.R)
+            self.control_cost += cp.quad_form(self.x[:, k], self.Q)
 
             # Goal reaching with cbf: b(x, t) = h(x) + gamma(t) >= 0
             for i in range(self.number_of_agents):
@@ -224,8 +226,7 @@ class MPCCentralized:
                     constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= -slack_terminal4[i][j])
 
 
-            self.control_cost += cp.quad_form(self.u[:, k], self.R)
-            self.control_cost += cp.quad_form(self.x[:, k], self.Q)
+            
 
         for i in range(self.number_of_agents):
             self.slack_cost_goal += slack_goal_weight*(cp.sum(cp.sum(slack_cbf1[i])) + cp.sum(cp.sum(slack_cbf2[i])) + cp.sum(cp.sum(slack_cbf3[i])) + cp.sum(cp.sum(slack_cbf4[i]))

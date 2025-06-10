@@ -21,7 +21,7 @@ random.seed()
 ##### PARAMETERS #####
 number_of_robots = 8
 goal_size = 4.0     # Goal square size
-T = 20              # Time for reaching goal
+T = 40              # Time for reaching goal
 safe_dist = 3       # Safety distance from other robots
 safe_dist_obs = 1   # Safety distance from obstacles
 grid_size = 100
@@ -52,7 +52,7 @@ goal_positions, goal_list = generate_valid_pos.generate_valid_goal_positions(gri
 
 ##### MPC #####
 # Parameters
-dt = 0.25
+dt = 0.5
 horizon_mpc = 4
 nx = 4          # Number of states (x, y, vx, vy) for each robot
 nu = 2          # Number of control inputs (ax, ay) for each robot
@@ -139,25 +139,25 @@ while collision_detected:
     N = x1_ref.shape[1] - 1  # Horizon steps
     horizon_mpc_decentralized = 8  # Horizon for decentralized MPC
     dt_mpc_decentralized = 0.25  # Time step for decentralized MPC
-    mpc_player1 = MPCPlayer1(horizon_mpc_decentralized, dt_mpc_decentralized, N, safe_dist)
-    mpc_player1.build()
-    mpc_player2 = MPCPlayer2(horizon_mpc_decentralized, dt_mpc_decentralized, N, safe_dist)
-    mpc_player2.build()
-    for i in range(max_iters):
+    mpc_player1 = MPCPlayer1(horizon_mpc_decentralized, dt_mpc_decentralized, N, safe_dist, goal_list[ind1], goal_size, step_to_reach_goal[ind1], obstacles)
+    mpc_player1.build(x0_1)
+    mpc_player2 = MPCPlayer2(horizon_mpc_decentralized, dt_mpc_decentralized, N, safe_dist, goal_list[ind2], goal_size, step_to_reach_goal[ind2], obstacles)
+    mpc_player2.build(x0_2)
+    for t in range(max_iters):
         x1_prev = x1_fixed.copy()
         x2_prev = x2_fixed.copy()
         # Player 1 solves MPC (returns states, controls, cost)
-        x1_opt, u1_opt = mpc_player1.solve_receding_horizon(x1_ref, x2_fixed, x0_1, N)
+        x1_opt, u1_opt = mpc_player1.solve_receding_horizon(x1_ref, x2_fixed, x0_1, N, t)
         x1_fixed = x1_opt
 
         # Player 2 solves MPC (returns states, controls, cost)
-        x2_opt, u2_opt = mpc_player2.solve_receding_horizon(x2_ref, x1_fixed, x0_2, N)
+        x2_opt, u2_opt = mpc_player2.solve_receding_horizon(x2_ref, x1_fixed, x0_2, N, t)
         x2_fixed = x2_opt
 
         # Check convergence by state trajectory difference
         diff1 = np.linalg.norm(x1_fixed - x1_prev)
         diff2 = np.linalg.norm(x2_fixed - x2_prev)
-        print(f"Iteration {i+1}: diff1 = {diff1:.6f}, diff2 = {diff2:.6f}")
+        print(f"Iteration {t+1}: diff1 = {diff1:.6f}, diff2 = {diff2:.6f}")
         if diff1 < tol and diff2 < tol:
             print("Converged")
             break

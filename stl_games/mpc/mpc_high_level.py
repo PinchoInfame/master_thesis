@@ -139,6 +139,8 @@ class MPCHighLevelPlanner:
         for k in range(self.horizon-1):
             x_next = self.define_dynamics(self.x[:, k], self.u[:, k])
             constraints.append(self.x[:, k + 1] == x_next)
+            self.control_cost += cp.quad_form(self.u[:, k], self.R)
+            self.control_cost += cp.quad_form(self.x[:, k], self.Q)
 
             # Goal reaching with cbf: b(x, t) = h(x) + gamma(t) >= 0
             for i in range(self.number_of_agents):
@@ -208,8 +210,7 @@ class MPCHighLevelPlanner:
                     constraints.append(h2_terminal + self.gamma_goal2[i][j][self.horizon] >= -slack_terminal2[i][j])
                     constraints.append(h3_terminal + self.gamma_goal3[i][j][self.horizon] >= -slack_terminal3[i][j])
                     constraints.append(h4_terminal + self.gamma_goal4[i][j][self.horizon] >= -slack_terminal4[i][j]) 
-            self.control_cost += cp.quad_form(self.u[:, k], self.R)
-            self.control_cost += cp.quad_form(self.x[:, k], self.Q)
+
         for i in range(self.number_of_agents):
             self.slack_cost_goal += slack_cost_weight*(cp.sum(cp.sum(slack_cbf1[i])) + cp.sum(cp.sum(slack_cbf2[i])) + cp.sum(cp.sum(slack_cbf3[i])) + cp.sum(cp.sum(slack_cbf4[i]))
                                                        + cp.sum(slack_terminal1[i]) + cp.sum(slack_terminal2[i]) + cp.sum(slack_terminal3[i]) + cp.sum(slack_terminal4[i]))
